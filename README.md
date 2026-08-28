@@ -1,14 +1,14 @@
-# 🔍 Person Detection & Retrieval Based on Predefined Visual Attributes
+# 🔍 Person Detection & Retrieval System (PDR-System)
 
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.5.1+cu121-orange?logo=pytorch)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.5%2Bcu121-orange?logo=pytorch)
 ![YOLOv8](https://img.shields.io/badge/YOLO-v8n-green?logo=yolo)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Web_UI-red?logo=streamlit)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
-**Đồ án tốt nghiệp** – Xây dựng giải pháp phát hiện / tìm người dựa trên đặc điểm nhận dạng cho trước
+**Hệ thống phát hiện và tìm kiếm người trong video dựa trên đặc điểm nhận dạng cho trước**
 
 *Person Detection and Retrieval Based on Predefined Visual Attributes*
 
@@ -18,72 +18,45 @@
 
 ## 🎯 Giới thiệu
 
-Hệ thống cho phép người dùng **mô tả đặc điểm ngoại hình** của người cần tìm (giới tính, màu áo, màu quần, balo, mũ, kính) và **tự động tìm kiếm** người đó trong video giám sát theo thời gian thực.
+Đây là một project mã nguồn mở hỗ trợ **phát hiện và tìm kiếm người** trong video giám sát hoặc video tải lên dựa trên các thuộc tính ngoại hình được định trước (giới tính, màu áo, màu quần, phụ kiện như mũ, kính, balo).
 
-**Ví dụ:** Tìm *"Nam, áo đen, đeo balo"* → hệ thống phát hiện, theo dõi và highlight đúng người trong video.
+Hệ thống kết hợp mô hình thị giác máy tính và học sâu (YOLOv8 + ByteTrack + ResNet50 PAR + Phân tích màu HSV) để xử lý và hiển thị kết quả theo thời gian thực qua giao diện web trực quan.
 
 ---
 
 ## ✨ Tính năng chính
 
-| Tính năng | Mô tả | Công nghệ |
-|---|---|---|
-| 🎯 Person Detection | Phát hiện người trong video | YOLOv8n (COCO pretrained) |
-| 🔄 Multi-Object Tracking | Gán Track ID ổn định liên frame | ByteTrack |
-| 👔 Color Detection | Nhận diện màu áo + màu quần | HSV + Trimmed Median |
-| 🧠 Attribute Recognition | Giới tính, Mũ, Kính, Balo | ResNet50 (PA-100K, mA=89.33%) |
-| ⏱️ Temporal Smoothing | Giảm rung giật nhãn khi tracking | Exponential Moving Average |
-| 🎯 Matching Engine | Chấm điểm tương đồng có trọng số | Weighted Score Algorithm |
-| 🌐 Web UI | Giao diện demo trực quan | Streamlit (100% Tiếng Việt) |
-| 🗄️ Database | Lưu lịch sử tìm kiếm | SQLite |
+- 🎯 **Phát hiện người (Person Detection):** Sử dụng YOLOv8n để phát hiện người trong từng khung hình.
+- 🔄 **Theo dõi đối tượng (Tracking):** ByteTrack duy trì Track ID ổn định qua các khung hình, giảm thiểu mất dấu khi bị che khuất tạm thời.
+- 👔 **Phân tích màu sắc (Color Recognition):** Trích xuất màu áo và màu quần trong không gian màu HSV kết hợp thuật toán lọc nhiễu Trimmed Median (xử lý ~0.1ms/người).
+- 🧠 **Nhận diện thuộc tính (Attribute Recognition):** ResNet50 nhận dạng giới tính, mũ, kính, balo.
+- ⏱️ **Làm mịn nhãn theo thời gian (Temporal EMA Smoothing):** Giảm rung giật nhãn phân loại qua chuỗi các khung hình liên tiếp.
+- 🎛️ **Bộ máy so khớp linh hoạt (Weighted Matching Engine):** Chấm điểm độ tương đồng (%) theo trọng số, hỗ trợ tìm kiếm linh hoạt với các thuộc tính tùy chọn (`Any`).
+- 🌐 **Giao diện Web tương tác (Streamlit):** Xem video trực tiếp, điều chỉnh bộ lọc, xem thống kê FPS và lưu lại lịch sử tìm kiếm vào SQLite.
 
 ---
 
-## 📊 Kết quả Đánh giá
-
-### PAR Model Accuracy (PA-100K Dataset, 10,000 test images)
-
-| Thuộc tính | Accuracy |
-|---|---|
-| Giới tính (Gender) | **85.20%** |
-| Đội Mũ (Hat) | **84.70%** |
-| Đeo Kính (Glasses) | **91.00%** |
-| Đeo Balo (Backpack) | **96.70%** |
-| ⭐ **Mean Accuracy (mA)** | **89.33%** |
-
-### FPS Benchmark (i5-10300H)
-
-| Module | CPU (i5-10300H) | GPU (GTX 1650) |
-|---|---|---|
-| YOLOv8n Detection | 16.9 FPS | 76.3 FPS |
-| ByteTrack Tracking | 16.6 FPS | 72.2 FPS |
-| ResNet50 PAR | 23.3 FPS | 87.3 FPS |
-| HSV Color Detector | 9,754 FPS | 9,983 FPS |
-| **⭐ Full Pipeline** | **~16 FPS** | **~70 FPS** |
-
----
-
-## 🏗️ Kiến trúc Pipeline
+## 🏗️ Luồng xử lý Pipeline
 
 ```
 Video / Camera Input
         ↓
 YOLOv8n Person Detection   → Phát hiện bounding box người
         ↓
-ByteTrack MOT Tracking     → Gán Track ID ổn định liên frame
+ByteTrack MOT Tracking     → Gán Track ID ổn định qua các frame
         ↓
-Person Crop ROI Extraction → Trích xuất vùng ảnh mỗi người
-        ↓  ┌────────────────────────────────────┐
-        ↓  │  HSV+Trimmed Median Color (~0.1ms) │
-        ↓  │  ResNet50 PAR Classifier (~11ms)   │
-        ↓  │  EMA Temporal Smoothing (α=0.35)   │
-        ↓  └────────────────────────────────────┘
+Person Crop ROI Extraction → Trích xuất vùng ảnh từng người
+        ↓  ┌────────────────────────────────────────┐
+        ↓  │  HSV + Trimmed Median Color (~0.1ms)   │
+        ↓  │  ResNet50 PAR Classifier (~11ms on GPU)│
+        ↓  │  Temporal EMA Smoothing (α=0.35)       │
+        ↓  └────────────────────────────────────────┘
         ↓
-Weighted Attribute Matching → Tính điểm % khớp với query
+Weighted Attribute Matching → Tính điểm tương đồng khớp với query
         ↓
-Person Retrieval Result    → Highlight Target / Others
+Person Retrieval Result    → Highlight đối tượng thỏa mãn
         ↓
-Streamlit Display + SQLite Save
+Streamlit Web UI + SQLite Database
 ```
 
 ---
@@ -91,93 +64,82 @@ Streamlit Display + SQLite Save
 ## 📁 Cấu trúc thư mục
 
 ```
-person-retrieval/
-├── app.py                    ← Entry point: Streamlit Web App
-├── config/config.yaml        ← Cấu hình hệ thống
-├── requirements.txt          ← Dependencies
+├── app.py                    # Giao diện Web Streamlit
+├── config/config.yaml        # Cấu hình tham số hệ thống
+├── requirements.txt          # Danh sách thư viện phụ thuộc
 │
 ├── src/
-│   ├── detection/detector.py ← YOLOv8n Person Detector
-│   ├── tracking/tracker.py   ← ByteTrack Tracker
+│   ├── detection/detector.py # Module phát hiện người (YOLOv8)
+│   ├── tracking/tracker.py   # Module theo dõi đối tượng (ByteTrack)
 │   ├── attributes/
-│   │   ├── color_detector.py ← HSV + Trimmed Median Color Classifier
-│   │   └── par_model.py      ← ResNet50 PAR (Gender/Hat/Glasses/Backpack)
+│   │   ├── color_detector.py # Phân tích màu áo / quần (HSV + Trimmed Median)
+│   │   └── par_model.py      # Nhận diện thuộc tính (ResNet50 PAR)
 │   ├── retrieval/
-│   │   ├── matcher.py        ← Weighted Attribute Matching Engine
-│   │   └── pipeline.py       ← End-to-End Pipeline Orchestrator
-│   ├── database/db.py        ← SQLite Search History Manager
-│   └── utils/                ← Logger, Video Utils, Visualization
+│   │   ├── matcher.py        # Bộ so khớp thuộc tính có trọng số
+│   │   └── pipeline.py       # Pipeline tích hợp toàn bộ luồng xử lý
+│   ├── database/db.py        # Quản lý lưu trữ SQLite
+│   └── utils/                # Tiện ích logging, video, vẽ khung visualization
 │
 ├── models/
-│   ├── yolo/yolov8n.pt       ← YOLOv8n model (6.2 MB, COCO pretrained)
-│   └── par/par_resnet50.pth  ← PAR model (94 MB, PA-100K fine-tuned)
+│   ├── yolo/yolov8n.pt       # Trọng số YOLOv8n
+│   └── par/par_resnet50.pth  # Trọng số ResNet50 PAR
 │
 ├── training/
-│   ├── train_par.py          ← Training script (Colab-ready, Colab T4)
-│   └── dataset_pa100k.py     ← PA-100K DataLoader
+│   ├── train_par.py          # Script huấn luyện mô hình PAR
+│   └── dataset_pa100k.py     # DataLoader chuẩn bị dữ liệu
 │
 ├── scripts/
-│   ├── evaluate_par.py       ← Evaluation script (mA, Precision, Recall)
-│   ├── benchmark_fps.py      ← FPS Benchmark tool
-│   ├── demo_pipeline.py      ← CLI demo
-│   └── test_*.py             ← Module test scripts
-│
-├── docs/
-│   ├── architecture.md       ← Chi tiết kiến trúc hệ thống
-│   ├── defense_qa_guide.md   ← Bộ câu hỏi phản biện bảo vệ (12 câu)
-│   └── thesis_report_outline.md ← Outline báo cáo đồ án
+│   ├── evaluate_par.py       # Đánh giá độ chính xác mô hình
+│   ├── benchmark_fps.py      # Đo kiểm hiệu năng / FPS
+│   └── demo_pipeline.py      # Chạy demo bằng dòng lệnh CLI
 │
 └── data/
-    └── test_videos/          ← Video test mẫu
+    └── test_videos/          # Video mẫu kiểm thử
 ```
 
 ---
 
-## 🚀 Cài đặt và Chạy
+## 🚀 Hướng dẫn cài đặt và sử dụng
 
-### 1. Yêu cầu hệ thống
-- Python 3.10+
-- NVIDIA GPU (khuyến nghị, GTX 1650+ / RTX series)
-- CUDA 12.1 (nếu dùng GPU)
-- RAM: 8 GB+, VRAM: 4 GB+
+### 1. Yêu cầu môi trường
+- Python 3.10 trở lên
+- Card đồ họa NVIDIA (khuyến nghị để đạt FPS cao) hoặc chạy trên CPU
 
 ### 2. Cài đặt
 
 ```bash
-# Clone repository
-git clone https://github.com/YOUR_USERNAME/person-retrieval.git
-cd person-retrieval
+# 1. Clone repository
+git clone https://github.com/nguyentainang246s-aduvip/Person-Detection-and-Retrieval-Based-on-Predefined-Visual-Attributes---PDR-System.git
+cd Person-Detection-and-Retrieval-Based-on-Predefined-Visual-Attributes---PDR-System
 
-# Tạo virtual environment
+# 2. Tạo và kích hoạt môi trường ảo
 python -m venv venv
-.\venv\Scripts\activate       # Windows
-# source venv/bin/activate    # Linux/Mac
+# Windows:
+.\venv\Scripts\activate
+# Linux / macOS:
+# source venv/bin/activate
 
-# Cài dependencies
+# 3. Cài đặt các gói phụ thuộc
 pip install -r requirements.txt
 
-# Cài PyTorch với CUDA (nếu có GPU NVIDIA)
+# 4. Cài đặt PyTorch hỗ trợ GPU CUDA (nếu máy có GPU NVIDIA)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-
-# Cài PyTorch CPU only (nếu không có GPU)
-pip install torch torchvision
 ```
 
-### 3. Chạy Web Demo
+### 3. Chạy giao diện Web
 
 ```bash
 streamlit run app.py
 ```
+Truy cập trình duyệt tại địa chỉ: `http://localhost:8501`
 
-Mở trình duyệt tại: `http://localhost:8501`
-
-### 4. Chạy qua CLI
+### 4. Chạy thử nghiệm bằng CLI
 
 ```bash
-# Tìm người Nam mặc áo đen
+# Tìm người Nam mặc áo Đen
 python scripts/demo_pipeline.py --gender Male --upper-color Black
 
-# Tìm người đội mũ đeo balo
+# Tìm người đội Mũ và đeo Balo
 python scripts/demo_pipeline.py --hat --backpack
 ```
 
@@ -187,89 +149,32 @@ python scripts/demo_pipeline.py --hat --backpack
 python scripts/benchmark_fps.py
 ```
 
-### 6. Đánh giá Model (cần dataset PA-100K)
-
-```bash
-# Hiển thị kết quả Colab training:
-python scripts/evaluate_par.py --demo
-
-# Đánh giá trên dataset thực:
-python scripts/evaluate_par.py --data-root datasets/PA100K
-```
-
 ---
 
-## 🎓 Training PAR Model
+## 🔧 Cấu hình hệ thống
 
-PAR Model (ResNet50) được fine-tune trên [PA-100K dataset](https://github.com/xh-liu/HydraPlus-Net#pa-100k-dataset).
-
-```bash
-# Trên Google Colab T4 GPU:
-python training/train_par.py
-# Output: models/par/par_resnet50.pth
-# Thời gian: ~45 phút (20 epochs, batch=32, T4 GPU)
-```
-
-**Kết quả training:**
-- Val mA: **89.33%** (epoch 18/20)
-- Training device: Colab T4 GPU
-- Training samples: 90,000 | Val samples: 10,000
-
----
-
-## 📱 Giao diện Web Demo
-
-Web app gồm 4 tab:
-
-| Tab | Chức năng |
-|---|---|
-| 🎯 Tìm kiếm Trực quan | Upload video → Chọn đặc điểm → Tìm kiếm real-time |
-| 📜 Lịch sử Tìm kiếm | Xem lại các phiên tìm kiếm đã lưu trong SQLite DB |
-| 📊 Đánh giá Mô hình | Bảng Accuracy, biểu đồ Plotly, FPS benchmark CPU vs GPU |
-| ℹ️ Giới thiệu | Sơ đồ pipeline, mô tả thuật toán |
-
----
-
-## 🔧 Cấu hình
-
-Tất cả tham số được quản lý trong [`config/config.yaml`](config/config.yaml):
+Các thông số vận hành có thể tùy chỉnh trực tiếp trong file [`config/config.yaml`](config/config.yaml):
 
 ```yaml
 detection:
   model: "yolov8n.pt"
   confidence: 0.4
-  device: "cuda"          # Tự động dùng GPU nếu có
+  device: "cuda"          # "cuda" hoặc "cpu"
 
 attributes:
-  input_size: [224, 112]  # Tỷ lệ người đứng (2:1)
+  input_size: [224, 112]  # Tỷ lệ crop người đứng (2:1)
   threshold:
     gender: 0.50
-    hat: 0.62             # Nâng cao tránh nhầm tóc đen
+    hat: 0.62
+    glasses: 0.50
+    backpack: 0.50
 
 matching:
-  default_threshold: 0.7  # Ngưỡng điểm khớp tối thiểu
+  default_threshold: 0.7  # Ngưỡng điểm khớp mặc định
 ```
-
----
-
-## 📚 Tài liệu tham khảo
-
-- [YOLOv8 - Ultralytics](https://github.com/ultralytics/ultralytics)
-- [ByteTrack: Multi-Object Tracking by Associating Every Detection Box](https://arxiv.org/abs/2110.06864)
-- [PA-100K Dataset - HydraPlus-Net](https://github.com/xh-liu/HydraPlus-Net#pa-100k-dataset)
-- [ResNet: Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
-- [Streamlit Documentation](https://docs.streamlit.io/)
-
----
-
-## 👤 Tác giả
-
-**Nguyễn Đức Tài Năng**
-- Email: nguyentainang246@gmail.com
-- Đồ án tốt nghiệp ngành Điện tử Viễn thông / Kỹ thuật máy tính
 
 ---
 
 ## 📄 License
 
-MIT License — xem file [LICENSE](LICENSE) để biết thêm chi tiết.
+Project được phân phối theo giấy phép MIT. Xem thêm tại [LICENSE](LICENSE).

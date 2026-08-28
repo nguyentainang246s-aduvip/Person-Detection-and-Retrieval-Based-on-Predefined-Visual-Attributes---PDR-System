@@ -112,7 +112,7 @@ BOOLEAN_MAP = {
 def main():
     # ── Tiêu đề ───────────────────────────────────────────────
     st.markdown('<div class="main-header">🔍 HỆ THỐNG PHÁT HIỆN VÀ TÌM KIẾM NGƯỜI TRONG VIDEO</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Đồ án tốt nghiệp: Tìm kiếm đối tượng người dựa trên đặc điểm ngoại hình (YOLOv8 + ByteTrack + ResNet50)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Hệ thống tìm kiếm người dựa trên đặc điểm ngoại hình (YOLOv8 + ByteTrack + ResNet50 PAR)</div>', unsafe_allow_html=True)
 
     pipeline = load_pipeline()
     db = load_db()
@@ -126,7 +126,7 @@ def main():
         "🎯 Tìm kiếm Trực quan",
         "📜 Lịch sử Tìm kiếm (Cơ sở dữ liệu)",
         "📊 Đánh giá Mô hình (Metrics)",
-        "ℹ️ Giới thiệu & Cấu trúc Đồ án"
+        "ℹ️ Giới thiệu & Cấu trúc Hệ thống"
     ])
 
     # ══════════════════════════════════════════════════════════
@@ -459,9 +459,9 @@ def main():
     # TAB 4: GIỚI THIỆU & CẤU TRÚC HỆ THỐNG
     # ══════════════════════════════════════════════════════════
     with tab_about:
-        st.subheader("📖 Tổng quan Đề tài Đồ án Tốt nghiệp")
+        st.subheader("📖 Tổng quan Dự án")
         st.markdown("""
-        * **Tên đề tài**: *Xây dựng giải pháp phát hiện / tìm người dựa trên đặc điểm nhận dạng cho trước (Person Detection and Retrieval Based on Predefined Visual Attributes)*
+        * **Tên dự án**: *Hệ thống phát hiện và tìm kiếm người dựa trên đặc điểm nhận dạng (Person Detection and Retrieval Based on Predefined Visual Attributes)*
         * **Các công nghệ và giải thuật cốt lõi**:
             1. **Phát hiện người (Detection)**: YOLOv8n (Pretrained COCO, lọc class 0 `person`)
             2. **Theo dõi đối tượng (Tracking)**: ByteTrack (Gán Track ID ổn định, liên kết 2 bước chống che khuất)
