@@ -1,0 +1,95 @@
+# ============================================================
+# .gitignore - Person Retrieval Project
+# ============================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.pyo
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# --- Virtual Environment ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- AI Models (quá lớn, dùng Git LFS hoặc tải riêng) ---
+# models/yolo/*.pt       ← uncomment nếu muốn exclude YOLO model
+# models/par/*.pth       ← uncomment nếu muốn exclude PAR model
+# Hiện tại: GIỮ models/ để tiện deploy (par_resnet50.pth = 94MB)
+
+# --- Dataset (không đưa lên GitHub) ---
+datasets/
+
+# --- Results (output, crops) ---
+results/crops/
+results/logs/
+results/*.mp4
+results/*.avi
+
+# --- Database (sinh ra lúc chạy) ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Video test lớn ---
+data/test_videos/*.mp4
+data/test_videos/*.avi
+data/test_videos/*.mov
+data/test_videos/*.mkv
+# GIỮ video mẫu nhỏ nếu < 5MB
+!data/test_videos/demo_search_video.mp4
+
+# --- Jupyter Notebooks output ---
+.ipynb_checkpoints/
+*.ipynb
+
+# --- IDE ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# --- Hệ điều hành ---
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# --- Temp / Cache ---
+*.tmp
+*.temp
+*.log
+*.bak
+*.swp
+*~
+.cache/
+
+# --- Streamlit ---
+.streamlit/secrets.toml
+
+# --- Coverage / Testing ---
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# --- Environment variables ---
+.env
+.env.local
+.env.*.local
+
+# --- Google Colab / Jupyter ---
+*.ipynb
+
+# --- Windows ---
+$RECYCLE.BIN/

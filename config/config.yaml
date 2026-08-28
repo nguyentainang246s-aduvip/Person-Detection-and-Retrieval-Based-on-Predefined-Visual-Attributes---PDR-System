@@ -1,0 +1,80 @@
+# ============================================================
+# config.yaml - Cấu hình toàn bộ hệ thống
+# Tất cả tham số được quản lý tại đây, không hard-code trong code
+# ============================================================
+
+# --- Đường dẫn project ---
+paths:
+  models_dir: "models"
+  yolo_model: "models/yolo/yolov8n.pt"
+  par_model: "models/par/par_resnet50.pth"
+  data_dir: "data"
+  results_dir: "results"
+  crops_dir: "results/crops"
+  logs_dir: "results/logs"
+  database: "results/person_retrieval.db"
+
+# --- Module Detection (YOLO) ---
+detection:
+  model: "yolov8n.pt"          # Model nhỏ nhất, đủ nhanh cho demo
+  confidence: 0.4              # Ngưỡng confidence tối thiểu
+  iou: 0.5                     # IoU threshold cho NMS
+  classes: [0]                 # Class 0 = person trong COCO
+  imgsz: 640                   # Kích thước ảnh input YOLO
+  device: "cuda"               # "cuda" khi có GPU GTX 1650, "cpu" nếu không có GPU
+
+# --- Module Tracking (ByteTrack) ---
+tracking:
+  tracker: "bytetrack.yaml"    # Config file ByteTrack (trong ultralytics)
+  persist: true                # Giữ track ID qua các frame
+
+# --- Module Attribute Recognition ---
+attributes:
+  input_size: [224, 112]       # Kích thước crop đưa vào PAR model (tỷ lệ người đứng)
+  # Ngưỡng để quyết định attribute = Yes (binary classification, đã cân chỉnh)
+  threshold:
+    gender: 0.50
+    hat: 0.62                  # Nâng cao tránh nhầm tóc đen/búi tóc
+    glasses: 0.50
+    backpack: 0.50
+
+# --- Evaluation ---
+evaluation:
+  dataset: "PA-100K"
+  val_mA: 0.8933               # Mean Accuracy từ Colab T4 training (20 epochs)
+  per_class:
+    gender_female: 0.852       # Accuracy giới tính
+    hat: 0.847                 # Accuracy nhận dạng mũ
+    glasses: 0.910             # Accuracy nhận dạng kính
+    backpack: 0.967            # Accuracy nhận dạng balo
+  eval_script: "scripts/evaluate_par.py"
+
+# --- Module Color Detection ---
+color:
+  # Phần trăm crop dùng để detect màu upper (50% trên = phần áo)
+  upper_ratio: 0.5
+  # Phần trăm crop dùng để detect màu lower (40% dưới = phần quần)
+  lower_ratio: 0.4
+  # Số cluster K-Means để tìm màu chủ đạo
+  n_clusters: 3
+  # Tên các màu hỗ trợ
+  upper_colors: ["Black", "White", "Red", "Blue", "Green", "Yellow", "Gray", "Other"]
+  lower_colors: ["Black", "White", "Blue", "Gray", "Other"]
+
+# --- Module Matching ---
+matching:
+  default_threshold: 0.7       # Ngưỡng điểm matching mặc định (70%)
+
+# --- Video Processing ---
+video:
+  # Nếu True: xử lý từng frame (chậm, chính xác hơn)
+  # Nếu False: skip frame (nhanh hơn, đủ cho demo)
+  process_every_n_frames: 2    # Xử lý 1 frame, bỏ qua 1 frame
+  display_width: 1280          # Độ rộng hiển thị video trong GUI
+  save_output: true            # Lưu video output có annotation
+
+# --- Streamlit GUI ---
+app:
+  title: "Person Retrieval System"
+  page_icon: "🔍"
+  layout: "wide"

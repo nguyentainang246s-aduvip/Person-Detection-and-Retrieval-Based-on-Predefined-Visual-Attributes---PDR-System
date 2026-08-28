@@ -1,0 +1,7 @@
+Attribute,Accuracy,Precision,Recall,F1,TP,FP,FN,TN
+gender_female,85.20%,-,-,-,-,-,-,-
+hat,84.70%,-,-,-,-,-,-,-
+glasses,91.00%,-,-,-,-,-,-,-
+backpack,96.70%,-,-,-,-,-,-,-
+
+Mean Accuracy (mA),89.33%

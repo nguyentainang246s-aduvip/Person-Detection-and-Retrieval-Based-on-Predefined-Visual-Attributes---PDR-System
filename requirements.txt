@@ -1,0 +1,40 @@
+# ============================================================
+# Person Retrieval Project - Requirements
+# Python 3.12 | CUDA 12.1 (GTX 1650)
+# ============================================================
+
+# --- Core Deep Learning ---
+# Cài PyTorch riêng theo CUDA (xem hướng dẫn bên dưới)
+# torch>=2.1.0
+# torchvision>=0.16.0
+
+# --- YOLO + Tracking ---
+ultralytics>=8.3.0          # YOLOv8/YOLO11 + ByteTrack built-in
+
+# --- Computer Vision ---
+opencv-python>=4.8.0        # Xử lý ảnh/video
+Pillow>=10.0.0              # Đọc/ghi ảnh
+
+# --- Numerical & ML ---
+numpy>=1.24.0               # Tính toán ma trận
+scikit-learn>=1.3.0         # K-Means color clustering, metrics
+
+# --- GUI ---
+streamlit>=1.28.0           # Web demo interface
+streamlit-webrtc>=0.47.0    # Webcam support (optional)
+
+# --- Data & Config ---
+PyYAML>=6.0                 # Đọc file config.yaml
+pandas>=2.0.0               # Xử lý CSV, DataFrame
+
+# --- Database ---
+# sqlite3 là built-in Python, không cần cài
+
+# --- Visualization ---
+matplotlib>=3.7.0           # Vẽ biểu đồ evaluation
+seaborn>=0.12.0             # Heatmap, confusion matrix
+tqdm>=4.65.0                # Progress bar khi training
+
+# --- Utilities ---
+scipy>=1.11.0               # Đọc file .mat (PA-100K annotation)
+requests>=2.31.0            # Download utilities
