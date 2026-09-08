@@ -65,7 +65,7 @@ color:
 
 # --- Module Matching ---
 matching:
-  default_threshold: 0.99      # Ngưỡng điểm matching mặc định (70%)
+  default_threshold: 0.50      # Ngưỡng điểm matching mặc định (50% attributes phải khớp)
 
 # --- Video Processing ---
 video:
