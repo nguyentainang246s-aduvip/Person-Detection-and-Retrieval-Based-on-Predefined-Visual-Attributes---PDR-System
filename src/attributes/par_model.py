@@ -174,3 +174,47 @@ class AttributeRecognizer:
                 "backpack": p_backpack
             }
         }
+
+    def _empty_result(self) -> dict:
+        return {
+            "gender": "Male", "gender_confidence": 0.5,
+            "hat": False, "hat_confidence": 0.0,
+            "glasses": False, "glasses_confidence": 0.0,
+            "backpack": False, "backpack_confidence": 0.0,
+            "raw_probs": {"female": 0.0, "hat": 0.0, "glasses": 0.0, "backpack": 0.0}
+        }
+
+    @torch.no_grad()
+    def predict_batch(self, person_crops: list) -> list:
+        valid_idx, tensors = [], []
+        for i, crop in enumerate(person_crops):
+            if crop is not None and crop.size > 0:
+                rgb = Image.fromarray(crop[:, :, ::-1])
+                tensors.append(self.transform(rgb))
+                valid_idx.append(i)
+
+        results = [self._empty_result() for _ in person_crops]
+        if not tensors:
+            return results
+
+        batch = torch.stack(tensors).to(self.device)
+        probs = self.model(batch).cpu().numpy()
+
+        for row_idx, orig_idx in enumerate(valid_idx):
+            p_female, p_hat, p_glasses, p_backpack = probs[row_idx]
+            is_female = p_female >= self.thresholds["gender"]
+            results[orig_idx] = {
+                "gender": "Female" if is_female else "Male",
+                "gender_confidence": round(float(p_female if is_female else 1 - p_female), 3),
+                "hat": bool(p_hat >= self.thresholds["hat"]),
+                "hat_confidence": round(float(p_hat), 3),
+                "glasses": bool(p_glasses >= self.thresholds["glasses"]),
+                "glasses_confidence": round(float(p_glasses), 3),
+                "backpack": bool(p_backpack >= self.thresholds["backpack"]),
+                "backpack_confidence": round(float(p_backpack), 3),
+                "raw_probs": {
+                    "female": float(p_female), "hat": float(p_hat),
+                    "glasses": float(p_glasses), "backpack": float(p_backpack),
+                },
+            }
+        return results

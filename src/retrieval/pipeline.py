@@ -54,6 +54,25 @@ from src.utils.logger import get_logger
 logger = get_logger("pipeline")
 
 
+TRACK_MEMORY_TTL_FRAMES = 300      # ~10-12s ở 25-30fps: track vắng mặt lâu hơn mức này sẽ bị xóa
+TRACK_MEMORY_MAX_SIZE = 500        # chặn trên tuyệt đối, phòng trường hợp fps rất cao / video rất dài
+
+def _evict_stale_tracks(track_memory: dict, frame_idx: int):
+    """Xóa các track_id không được cập nhật trong TRACK_MEMORY_TTL_FRAMES frame gần nhất."""
+    stale_ids = [
+        tid for tid, mem in track_memory.items()
+        if frame_idx - mem["last_updated"] > TRACK_MEMORY_TTL_FRAMES
+    ]
+    for tid in stale_ids:
+        track_memory.pop(tid, None)
+
+    # Chặn trên cứng: nếu vẫn còn quá nhiều, xóa bớt các track cũ nhất theo last_updated.
+    if len(track_memory) > TRACK_MEMORY_MAX_SIZE:
+        by_age = sorted(track_memory.items(), key=lambda kv: kv[1]["last_updated"])
+        n_to_drop = len(track_memory) - TRACK_MEMORY_MAX_SIZE
+        for tid, _ in by_age[:n_to_drop]:
+            track_memory.pop(tid, None)
+
 class PersonRetrievalPipeline:
     """
     Bộ điều phối toàn diện cho hệ thống phát hiện và tìm người theo đặc điểm nhận dạng.
@@ -114,144 +133,123 @@ class PersonRetrievalPipeline:
         target_query: dict,
         threshold: float = None
     ) -> tuple:
-        """
-        Xử lý 1 frame video đơn lẻ.
-
-        INPUT:
-            frame: Ảnh BGR (H, W, 3)
-            frame_idx: Số thứ tự frame
-            target_query: Bộ tiêu chí tìm kiếm
-            threshold: Ngưỡng matching (mặc định lấy theo pipeline)
-
-        OUTPUT:
-            annotated_frame (np.ndarray): Frame đã vẽ bounding box và nhãn
-            matched_persons_this_frame (list): Danh sách người khớp query trong frame này
-        """
         thresh = threshold or self.matching_threshold
 
-        # 1. Tracking: Lấy danh sách người kèm Track ID
+        # Dọn dẹp định kỳ (rẻ, chỉ duyệt dict) để tránh memory leak trên video dài
+        if frame_idx % 50 == 0:
+            _evict_stale_tracks(self.track_memory, frame_idx)
+
         tracked_objects = self.tracker.track(frame, persist=True)
 
         matched_persons_this_frame = []
         annotated_frame = frame.copy()
 
-        # Phân phối tải: Giới hạn tối đa 2 người chạy mạng CNN nặng trong cùng 1 frame
-        # để đảm bảo tốc độ khung hình (FPS) luôn duy trì mượt mà > 20 FPS
-        cnn_analysis_count = 0
         MAX_CNN_PER_FRAME = 2
 
+        # --- Bước 1: xác định object nào CẦN phân tích, xếp theo mức độ "đói" ---
+        candidates = []  # (wait_time, obj)
         for obj in tracked_objects:
             track_id = obj["track_id"]
-            bbox = obj["bbox"]
+            mem = self.track_memory.get(track_id)
+            if mem is None:
+                candidates.append((float("inf"), obj))  # track mới toanh -> ưu tiên tuyệt đối
+                continue
+            obs_count = mem.get("obs_count", 0)
+            interval = self.attr_interval if obs_count < 3 else 20
+            wait = frame_idx - mem["last_updated"]
+            if wait >= interval:
+                candidates.append((wait, obj))
 
-            # Kiểm tra xem Track ID này đã được phân tích chưa
-            need_analysis = True
-            if track_id in self.track_memory:
-                mem = self.track_memory[track_id]
-                last_frame = mem["last_updated"]
-                obs_count = mem.get("obs_count", 0)
-                # Người đã có 3 lần phân tích ổn định thì chỉ cập nhật lại sau mỗi 20 frames
-                interval = self.attr_interval if obs_count < 3 else 20
-                if frame_idx - last_frame < interval:
-                    need_analysis = False
+        # Ưu tiên track chờ lâu nhất trước (thay vì thứ tự trả về của tracker)
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        to_analyze = candidates[:MAX_CNN_PER_FRAME]
+        to_analyze_ids = {obj["track_id"] for _, obj in to_analyze}
 
-            # Nếu vượt quá ngân sách tính toán trong 1 frame, hoãn phân tích người này sang frame kế tiếp
-            if need_analysis and cnn_analysis_count >= MAX_CNN_PER_FRAME:
-                need_analysis = False
+        # --- Bước 2: crop + batch inference cho các track được chọn ---
+        if to_analyze:
+            crops, valid_objs = [], []
+            for _, obj in to_analyze:
+                crop = crop_person(frame, obj["bbox"])
+                if crop is not None and crop.size > 0:
+                    crops.append(crop)
+                    valid_objs.append(obj)
 
-            if need_analysis:
-                # 2. Crop ảnh người
-                person_crop = crop_person(frame, bbox)
+            if crops:
+                # 1 forward pass duy nhất cho tất cả crop cần phân tích trong frame này
+                par_batch = self.par_recognizer.predict_batch(crops)   # list[dict]
+                colors_batch = [self.color_detector.detect_colors(c) for c in crops]  # rẻ, không cần batch
 
-                if person_crop is not None and person_crop.size > 0:
-                    cnn_analysis_count += 1
-
-                    # 3. Nhận dạng màu sắc (Áo, Quần) - Chạy tức thì < 0.1ms
-                    colors = self.color_detector.detect_colors(person_crop)
-
-                    # 4. Nhận dạng thuộc tính AI (Giới tính, Mũ, Kính, Balo)
-                    par_attrs = self.par_recognizer.predict(person_crop)
+                for obj, crop, par_attrs, colors in zip(valid_objs, crops, par_batch, colors_batch):
+                    track_id = obj["track_id"]
                     raw = par_attrs.get("raw_probs", {})
+                    prev = self.track_memory.get(track_id)
 
-                    # Áp dụng bộ lọc trung bình tích lũy theo thời gian (Temporal EMA Smoothing)
-                    # để loại bỏ hoàn toàn rung giật nhãn khi người di chuyển hoặc xoay góc
-                    if track_id in self.track_memory and "smooth_probs" in self.track_memory[track_id]:
-                        old_probs = self.track_memory[track_id]["smooth_probs"]
-                        alpha = 0.35  # 35% frame mới, 65% lịch sử tích lũy
-                        smooth_p_female = (1.0 - alpha) * old_probs["female"] + alpha * raw.get("female", 0.5)
-                        smooth_p_hat = (1.0 - alpha) * old_probs["hat"] + alpha * raw.get("hat", 0.0)
-                        smooth_p_glasses = (1.0 - alpha) * old_probs["glasses"] + alpha * raw.get("glasses", 0.0)
-                        smooth_p_backpack = (1.0 - alpha) * old_probs["backpack"] + alpha * raw.get("backpack", 0.0)
+                    if prev and "smooth_probs" in prev:
+                        old_probs = prev["smooth_probs"]
+                        alpha = 0.35
+                        smooth = {
+                            k: (1.0 - alpha) * old_probs[k] + alpha * raw.get(k, old_probs[k])
+                            for k in ("female", "hat", "glasses", "backpack")
+                        }
                     else:
-                        smooth_p_female = raw.get("female", 0.5)
-                        smooth_p_hat = raw.get("hat", 0.0)
-                        smooth_p_glasses = raw.get("glasses", 0.0)
-                        smooth_p_backpack = raw.get("backpack", 0.0)
+                        smooth = {
+                            "female": raw.get("female", 0.5),
+                            "hat": raw.get("hat", 0.0),
+                            "glasses": raw.get("glasses", 0.0),
+                            "backpack": raw.get("backpack", 0.0),
+                        }
 
-                    smooth_probs = {
-                        "female": smooth_p_female,
-                        "hat": smooth_p_hat,
-                        "glasses": smooth_p_glasses,
-                        "backpack": smooth_p_backpack
-                    }
-
-                    # Quyết định thuộc tính sau khi đã làm mịn qua nhiều frame
-                    is_female = smooth_p_female >= self.par_recognizer.thresholds["gender"]
-                    final_gender = "Female" if is_female else "Male"
-                    final_hat = smooth_p_hat >= self.par_recognizer.thresholds["hat"]
-                    final_glasses = smooth_p_glasses >= self.par_recognizer.thresholds["glasses"]
-                    final_backpack = smooth_p_backpack >= self.par_recognizer.thresholds["backpack"]
-
-                    # 5. Hợp nhất thuộc tính
+                    is_female = smooth["female"] >= self.par_recognizer.thresholds["gender"]
                     attrs = {
-                        "gender": final_gender,
-                        "gender_confidence": round(smooth_p_female if is_female else (1.0 - smooth_p_female), 3),
-                        "hat": final_hat,
-                        "hat_confidence": round(smooth_p_hat, 3),
-                        "glasses": final_glasses,
-                        "glasses_confidence": round(smooth_p_glasses, 3),
-                        "backpack": final_backpack,
-                        "backpack_confidence": round(smooth_p_backpack, 3),
+                        "gender": "Female" if is_female else "Male",
+                        "gender_confidence": round(smooth["female"] if is_female else 1.0 - smooth["female"], 3),
+                        "hat": smooth["hat"] >= self.par_recognizer.thresholds["hat"],
+                        "hat_confidence": round(smooth["hat"], 3),
+                        "glasses": smooth["glasses"] >= self.par_recognizer.thresholds["glasses"],
+                        "glasses_confidence": round(smooth["glasses"], 3),
+                        "backpack": smooth["backpack"] >= self.par_recognizer.thresholds["backpack"],
+                        "backpack_confidence": round(smooth["backpack"], 3),
                         **colors,
-                        "track_id": track_id
+                        "track_id": track_id,
                     }
 
-                    # 6. So khớp với Query của người dùng
                     is_match, score, breakdown = self.matcher.is_match(target_query, attrs, threshold=thresh)
+                    obs_count = (prev.get("obs_count", 0) + 1) if prev else 1
 
-                    # Lưu vào bộ nhớ đệm
                     self.track_memory[track_id] = {
                         "attributes": attrs,
-                        "smooth_probs": smooth_probs,
+                        "smooth_probs": smooth,
                         "last_updated": frame_idx,
+                        "obs_count": obs_count,
                         "matched": is_match,
                         "score": score,
                         "breakdown": breakdown,
-                        "crop": person_crop
+                        # Không giữ ảnh crop full-res mãi trong RAM; chỉ giữ crop khi vừa match
+                        # để ghi ra đĩa ngay trong run_on_video, có thể giải phóng ngay sau đó.
+                        "crop": crop if is_match else None,
                     }
 
-            # Lấy thông tin từ bộ nhớ đệm để hiển thị
+        # --- Bước 3: vẽ + gom kết quả (đọc từ cache, không phân tích lại) ---
+        for obj in tracked_objects:
+            track_id = obj["track_id"]
+            bbox = obj["bbox"]
             mem = self.track_memory.get(track_id)
-            if mem:
-                is_target = mem["matched"]
-                info_to_draw = {**mem["attributes"], "score": mem["score"]}
+            if not mem:
+                continue
 
-                if is_target:
-                    matched_persons_this_frame.append({
-                        "track_id": track_id,
-                        "bbox": bbox,
-                        "score": mem["score"],
-                        "attributes": mem["attributes"],
-                        "crop": mem.get("crop")
-                    })
+            is_target = mem["matched"]
+            info_to_draw = {**mem["attributes"], "score": mem["score"]}
 
-                # Vẽ bounding box & nhãn lên frame
-                annotated_frame = draw_person_info(
-                    annotated_frame,
-                    bbox,
-                    info_to_draw,
-                    matched=is_target
-                )
+            if is_target:
+                matched_persons_this_frame.append({
+                    "track_id": track_id,
+                    "bbox": bbox,
+                    "score": mem["score"],
+                    "attributes": mem["attributes"],
+                    "crop": mem.get("crop"),
+                })
+
+            annotated_frame = draw_person_info(annotated_frame, bbox, info_to_draw, matched=is_target)
 
         return annotated_frame, matched_persons_this_frame
 
