@@ -70,98 +70,96 @@ ATTR_NAMES = ["female", "hat", "glasses", "backpack"]
 # ══════════════════════════════════════════════════════════
 
 
-class PARModel(nn.Module):
+from src.attributes.par_model import ResNet50PAR
+
+
+def compute_par_metrics(preds: torch.Tensor, labels: torch.Tensor,
+                        threshold: float = 0.5) -> dict:
     """
-    PAR Model = ResNet50 Backbone + FC Classification Head.
-
-    INPUT:  (batch, 3, 224, 112) - person crop đã normalize
-    OUTPUT: (batch, 4) - sigmoid probabilities cho 4 attributes
+    Metric chuẩn PAR (Li et al., PA-100K):
+      mA  = (1/N) * Σ_attrs 0.5 * (TP/P + TN/N)  (Balanced Mean Accuracy)
+      + per-attribute Precision / Recall / F1 (cho dữ liệu mất cân bằng)
     """
+    pred_bin = (preds >= threshold).float()
+    n_attrs = preds.shape[1]
+    per_attr = {}
+    ma_sum = 0.0
 
-    def __init__(self, n_attrs=4, pretrained=True):
-        super().__init__()
+    for i in range(n_attrs):
+        P = labels[:, i].sum().clamp(min=1)
+        N = (1 - labels[:, i]).sum().clamp(min=1)
+        TP = (pred_bin[:, i] * labels[:, i]).sum()
+        TN = ((1 - pred_bin[:, i]) * (1 - labels[:, i])).sum()
 
-        # Load ResNet50 pretrained ImageNet
-        weights = models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None
-        backbone = models.resnet50(weights=weights)
+        precision = TP / pred_bin[:, i].sum().clamp(min=1)
+        recall    = TP / P
+        f1        = 2 * precision * recall / (precision + recall).clamp(min=1e-8)
 
-        # Bỏ FC layer cuối của ResNet50 (2048 → 1000)
-        # Giữ lại từ conv1 đến avgpool
-        self.backbone = nn.Sequential(*list(backbone.children())[:-1])
-        # Output shape: (batch, 2048, 1, 1)
+        per_attr[i] = {
+            "acc": ((TP + TN) / len(labels)).item(),
+            "precision": precision.item(),
+            "recall": recall.item(),
+            "f1": f1.item(),
+        }
+        ma_sum += 0.5 * (TP / P + TN / N)
 
-        # FC head mới cho attribute recognition
-        self.classifier = nn.Sequential(
-            nn.Flatten(),               # (batch, 2048)
-            nn.Dropout(p=0.5),          # Regularization
-            nn.Linear(2048, 512),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.3),
-            nn.Linear(512, n_attrs),
-            nn.Sigmoid()               # Output: [0, 1] probability
-        )
-
-    def forward(self, x):
-        """
-        x: (batch, 3, 224, 112)
-        return: (batch, 4) sigmoid probs
-        """
-        features = self.backbone(x)     # (batch, 2048, 1, 1)
-        output = self.classifier(features)  # (batch, 4)
-        return output
+    ma = (ma_sum / n_attrs).item()
+    mean_f1 = sum(a["f1"] for a in per_attr.values()) / n_attrs
+    return {"mA": ma, "mean_F1": mean_f1, "per_attr": per_attr}
 
 
-def compute_mean_accuracy(preds, labels, threshold=0.5):
-    """
-    Tính Mean Accuracy (mA) — metric chuẩn trong PAR.
+@torch.no_grad()
+def tune_thresholds(model, loader, device, attr_names):
+    """Chọn threshold tối ưu F1 cho từng attribute trên val set."""
+    model.eval()
+    all_logits, all_labels = [], []
+    for images, labels in loader:
+        logits = model(images.to(device)).cpu()
+        all_logits.append(logits)
+        all_labels.append(labels)
+    logits = torch.cat(all_logits)
+    labels = torch.cat(all_labels)
+    probs = 1.0 / (1.0 + torch.exp(-logits))
 
-    mA = (1/N_attrs) × Σ [ (TP_i + TN_i) / (P_i + N_i) ]
-
-    Nghĩa là: accuracy trung bình qua từng attribute.
-
-    INPUT:
-        preds:  (N, 4) tensor float32, giá trị 0–1
-        labels: (N, 4) tensor float32, giá trị 0 hoặc 1
-        threshold: ngưỡng để quyết định 0/1
-
-    OUTPUT:
-        ma: float - mean accuracy (0–1)
-        per_attr: list[float] - accuracy từng attribute
-    """
-    pred_binary = (preds >= threshold).float()   # (N, 4)
-
-    per_attr = []
-    for i in range(preds.shape[1]):
-        correct = (pred_binary[:, i] == labels[:, i]).float().sum()
-        acc = correct / len(labels)
-        per_attr.append(acc.item())
-
-    ma = sum(per_attr) / len(per_attr)
-    return ma, per_attr
+    best_thr = {}
+    for i, name in enumerate(attr_names):
+        best_f1, best_t = 0.0, 0.5
+        for t in np.arange(0.10, 0.90, 0.02):
+            p = (probs[:, i] >= t).float()
+            tp = (p * labels[:, i]).sum()
+            prec = tp / p.sum().clamp(min=1)
+            rec  = tp / labels[:, i].sum().clamp(min=1)
+            f1 = 2 * prec * rec / (prec + rec).clamp(min=1e-8)
+            if f1 > best_f1:
+                best_f1, best_t = f1.item(), t
+        best_thr[name] = round(float(best_t), 2)
+        print(f"  [Tune Threshold] {name:<10}: best thr={best_t:.2f} (F1={best_f1:.4f})")
+    return best_thr
 
 
 def train_one_epoch(model, loader, optimizer, criterion, device, epoch):
     """Chạy một epoch training."""
     model.train()
     total_loss = 0.0
-    all_preds = []
+    all_probs = []
     all_labels = []
 
     for batch_idx, (images, labels) in enumerate(loader):
         images = images.to(device)
         labels = labels.to(device)
 
-        # Forward pass
+        # Forward pass (model trả về logits thô)
         optimizer.zero_grad()
-        outputs = model(images)         # (batch, 4)
-        loss = criterion(outputs, labels)
+        logits = model(images)         # (batch, 4) logits
+        loss = criterion(logits, labels)
 
         # Backward pass
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
-        all_preds.append(outputs.detach().cpu())
+        probs = 1.0 / (1.0 + torch.exp(-logits.detach()))
+        all_probs.append(probs.cpu())
         all_labels.append(labels.cpu())
 
         # In tiến độ
@@ -169,12 +167,12 @@ def train_one_epoch(model, loader, optimizer, criterion, device, epoch):
             print(f"  Epoch {epoch} | Batch {batch_idx+1}/{len(loader)} | "
                   f"Loss: {loss.item():.4f}")
 
-    all_preds = torch.cat(all_preds, dim=0)
+    all_probs = torch.cat(all_probs, dim=0)
     all_labels = torch.cat(all_labels, dim=0)
-    ma, per_attr = compute_mean_accuracy(all_preds, all_labels)
+    metrics = compute_par_metrics(all_probs, all_labels)
     avg_loss = total_loss / len(loader)
 
-    return avg_loss, ma, per_attr
+    return avg_loss, metrics["mA"], [metrics["per_attr"][i]["acc"] for i in range(len(metrics["per_attr"]))]
 
 
 @torch.no_grad()
@@ -182,26 +180,27 @@ def evaluate(model, loader, criterion, device):
     """Evaluate model trên val/test set."""
     model.eval()
     total_loss = 0.0
-    all_preds = []
+    all_probs = []
     all_labels = []
 
     for images, labels in loader:
         images = images.to(device)
         labels = labels.to(device)
 
-        outputs = model(images)
-        loss = criterion(outputs, labels)
+        logits = model(images)
+        loss = criterion(logits, labels)
 
         total_loss += loss.item()
-        all_preds.append(outputs.cpu())
+        probs = 1.0 / (1.0 + torch.exp(-logits))
+        all_probs.append(probs.cpu())
         all_labels.append(labels.cpu())
 
-    all_preds = torch.cat(all_preds, dim=0)
+    all_probs = torch.cat(all_probs, dim=0)
     all_labels = torch.cat(all_labels, dim=0)
-    ma, per_attr = compute_mean_accuracy(all_preds, all_labels)
+    metrics = compute_par_metrics(all_probs, all_labels)
     avg_loss = total_loss / len(loader)
 
-    return avg_loss, ma, per_attr
+    return avg_loss, metrics["mA"], [metrics["per_attr"][i]["acc"] for i in range(len(metrics["per_attr"]))]
 
 
 def train():
@@ -226,7 +225,7 @@ def train():
 
     # ── Model ──
     print("\n  Building model...")
-    model = PARModel(n_attrs=N_ATTRS, pretrained=True).to(device)
+    model = ResNet50PAR(n_attrs=N_ATTRS, pretrained=True).to(device)
 
     # Đếm số parameters
     total_params = sum(p.numel() for p in model.parameters())
@@ -235,8 +234,20 @@ def train():
     print(f"  Trainable params: {trainable_params:,}")
 
     # ── Loss & Optimizer ──
-    # BCELoss vì đây là multi-label binary classification
-    criterion = nn.BCELoss()
+    # Tính pos_weight cho BCEWithLogitsLoss để bù đắp mất cân bằng mẫu (đặc biệt Hat, Glasses, Backpack)
+    try:
+        train_ds = train_loader.dataset
+        labels_all = torch.tensor(train_ds.labels, dtype=torch.float32)
+        pos = labels_all.sum(dim=0)
+        neg = len(train_ds) - pos
+        pos_weight = (neg / pos.clamp(min=1.0)).to(device)
+        print(f"  Computed pos_weight: " + " | ".join(
+            f"{ATTR_NAMES[i]}={pos_weight[i]:.2f}" for i in range(N_ATTRS)
+        ))
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    except Exception as e:
+        print(f"  [Warning] Không thể tự động tính pos_weight ({e}), dùng BCEWithLogitsLoss mặc định.")
+        criterion = nn.BCEWithLogitsLoss()
 
     # Dùng 2 learning rate khác nhau:
     # - Backbone: lr thấp (đã pretrained, không cần học nhiều)
@@ -293,13 +304,15 @@ def train():
         ))
         print(f"  LR: {current_lr:.2e}")
 
-        # Lưu model tốt nhất
+        # Lưu model tốt nhất & tune thresholds
         if val_ma > best_val_ma:
             best_val_ma = val_ma
+            best_thr = tune_thresholds(model, val_loader, device, ATTR_NAMES)
             torch.save({
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
                 "val_ma": val_ma,
+                "thresholds": best_thr,
                 "attr_names": ATTR_NAMES,
             }, best_model_path)
             print(f"  ✅ Saved best model! (val mA: {val_ma*100:.2f}%)")

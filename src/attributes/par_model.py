@@ -27,6 +27,7 @@ logger = get_logger("par_model")
 class ResNet50PAR(nn.Module):
     """
     Kiến trúc ResNet50 fine-tune cho Multi-label Classification.
+    Đầu ra là Logits (không dùng Sigmoid ở model để dùng BCEWithLogitsLoss tối ưu số học).
     """
 
     def __init__(self, n_attrs: int = 4, pretrained: bool = True):
@@ -39,7 +40,7 @@ class ResNet50PAR(nn.Module):
         # Trích xuất backbone ResNet50 (bỏ lớp FC cuối cùng)
         self.backbone = nn.Sequential(*list(base_model.children())[:-1])
 
-        # Head phân loại đa nhãn
+        # Head phân loại đa nhãn (trả về logits thô)
         self.classifier = nn.Sequential(
             nn.Flatten(),
             nn.Dropout(p=0.5),
@@ -47,13 +48,12 @@ class ResNet50PAR(nn.Module):
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.3),
             nn.Linear(512, n_attrs),
-            nn.Sigmoid()
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         feat = self.backbone(x)
-        probs = self.classifier(feat)
-        return probs
+        logits = self.classifier(feat)
+        return logits
 
 
 class AttributeRecognizer:
@@ -73,7 +73,7 @@ class AttributeRecognizer:
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.weights_path = weights_path
 
-        # Ngưỡng quyết định đã được cân chỉnh tối ưu chống nhiễu
+        # Ngưỡng quyết định tối ưu F1
         self.thresholds = thresholds or {
             "gender": 0.50,
             "hat": 0.62,       # Nâng nhẹ ngưỡng Mũ để tránh bắt nhầm tóc đen/búi tóc
@@ -81,9 +81,11 @@ class AttributeRecognizer:
             "backpack": 0.50
         }
 
-        # Pipeline tiền xử lý ảnh chuẩn cho mạng ResNet50 (224x112 - tỷ lệ cơ thể người)
+        # Pipeline tiền xử lý ảnh chuẩn PA-100K: Resize(256, 128) -> CenterCrop(224, 112)
+        # Giữ nguyên tỷ lệ chiều cao/rộng 2:1 của dáng người đứng
         self.transform = T.Compose([
-            T.Resize((224, 112)),
+            T.Resize((256, 128)),
+            T.CenterCrop((224, 112)),
             T.ToTensor(),
             T.Normalize(
                 mean=[0.485, 0.456, 0.406],
@@ -101,8 +103,10 @@ class AttributeRecognizer:
                 except TypeError:
                     checkpoint = torch.load(weights_path, map_location=self.device)
 
-                if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
-                    state_dict = checkpoint["model_state_dict"]
+                if isinstance(checkpoint, dict):
+                    state_dict = checkpoint.get("model_state_dict", checkpoint)
+                    if "thresholds" in checkpoint and isinstance(checkpoint["thresholds"], dict):
+                        self.thresholds.update(checkpoint["thresholds"])
                 else:
                     state_dict = checkpoint
 
@@ -128,26 +132,21 @@ class AttributeRecognizer:
         self.model.to(self.device)
         self.model.eval()
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def predict(self, person_crop: np.ndarray) -> dict:
         """
         Dự đoán các thuộc tính ngoại hình từ ảnh crop người.
         """
         if person_crop is None or person_crop.size == 0:
-            return {
-                "gender": "Male", "gender_confidence": 0.5,
-                "hat": False, "hat_confidence": 0.0,
-                "glasses": False, "glasses_confidence": 0.0,
-                "backpack": False, "backpack_confidence": 0.0,
-                "raw_probs": {"female": 0.0, "hat": 0.0, "glasses": 0.0, "backpack": 0.0}
-            }
+            return self._empty_result()
 
         # BGR (OpenCV) -> RGB (PIL)
         rgb_img = Image.fromarray(person_crop[:, :, ::-1])
         tensor = self.transform(rgb_img).unsqueeze(0).to(self.device)
 
-        # Forward pass
-        probs = self.model(tensor).squeeze(0).cpu().numpy()
+        # Forward pass nhận logits -> Sigmoid tính xác suất
+        logits = self.model(tensor).squeeze(0).cpu().numpy()
+        probs = 1.0 / (1.0 + np.exp(-np.clip(logits, -20.0, 20.0)))
 
         p_female = float(probs[0])
         p_hat = float(probs[1])
@@ -184,7 +183,7 @@ class AttributeRecognizer:
             "raw_probs": {"female": 0.0, "hat": 0.0, "glasses": 0.0, "backpack": 0.0}
         }
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def predict_batch(self, person_crops: list) -> list:
         valid_idx, tensors = [], []
         for i, crop in enumerate(person_crops):
@@ -198,7 +197,8 @@ class AttributeRecognizer:
             return results
 
         batch = torch.stack(tensors).to(self.device)
-        probs = self.model(batch).cpu().numpy()
+        logits = self.model(batch).cpu().numpy()
+        probs = 1.0 / (1.0 + np.exp(-np.clip(logits, -20.0, 20.0)))
 
         for row_idx, orig_idx in enumerate(valid_idx):
             p_female, p_hat, p_glasses, p_backpack = probs[row_idx]

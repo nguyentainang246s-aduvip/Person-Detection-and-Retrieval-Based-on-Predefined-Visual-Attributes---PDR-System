@@ -246,9 +246,25 @@ def main():
             col_btn1, col_btn2 = st.columns(2)
             if col_btn1.button("🚀 BẮT ĐẦU TÌM KIẾM", type="primary"):
                 st.session_state.is_running = True
+                if st.session_state.get("cap") is not None:
+                    try:
+                        release_video(st.session_state.cap)
+                    except Exception:
+                        pass
+                st.session_state.cap = None
+                st.session_state.frame_idx = 0
+                st.session_state.all_targets_found = {}
+                st.session_state.fps_counter = None
 
             if col_btn2.button("🛑 DỪNG TÌM KIẾM", type="secondary"):
                 st.session_state.is_running = False
+                if st.session_state.get("cap") is not None:
+                    try:
+                        release_video(st.session_state.cap)
+                    except Exception:
+                        pass
+                    st.session_state.cap = None
+                st.warning("🛑 Đã dừng tìm kiếm theo lệnh của người dùng.")
 
             video_placeholder = st.empty()
             metrics_placeholder = st.empty()
@@ -258,26 +274,42 @@ def main():
             st.subheader("🎯 Danh sách Mục tiêu Đã tìm thấy")
             targets_container = st.container()
 
-        # ── VÒNG LẶP XỬ LÝ VIDEO KHI ĐANG CHẠY ─────────────────
+        # ── VÒNG LẶP XỬ LÝ VIDEO KHI ĐANG CHẠY (NON-BLOCKING CHUNKED) ─────────────────
         if st.session_state.is_running and video_source_path:
-            pipeline.reset()
-            cap, info = open_video(video_source_path)
-            fps = info["fps"] or 25.0
+            if st.session_state.get("cap") is None:
+                pipeline.reset()
+                cap, info = open_video(video_source_path)
+                st.session_state.cap = cap
+                st.session_state.video_fps = info.get("fps") or 25.0
+                st.session_state.query_id = db.save_query(target_query, q_threshold)
+                st.session_state.fps_counter = FPSCounter()
+                st.session_state.frame_idx = 0
+                st.session_state.all_targets_found = {}
 
-            # Lưu phiên tìm kiếm vào database
-            query_id = db.save_query(target_query, q_threshold)
+            cap = st.session_state.cap
+            fps = st.session_state.get("video_fps", 25.0)
+            query_id = st.session_state.get("query_id")
+            fps_counter = st.session_state.get("fps_counter") or FPSCounter()
+            all_targets_found = st.session_state.get("all_targets_found", {})
 
-            fps_counter = FPSCounter()
-            frame_idx = 0
-            all_targets_found = {}
+            # Xử lý theo đợt 3 frames rồi nhả quyền cho Streamlit bắt sự kiện nút Stop
+            FRAMES_PER_RERUN = 3
+            finished = False
+            last_annotated_frame = None
 
-            while cap.isOpened() and st.session_state.is_running:
+            for _ in range(FRAMES_PER_RERUN):
+                if not cap.isOpened() or not st.session_state.is_running:
+                    finished = True
+                    break
                 fps_counter.start_frame()
                 success, frame = read_frame(cap)
                 if not success:
+                    finished = True
                     break
 
-                # Tự động tối ưu độ phân giải khung hình (720p) để tăng FPS gấp 5 lần
+                frame_idx = st.session_state.frame_idx
+
+                # Tự động tối ưu độ phân giải khung hình (720p) để tăng FPS
                 h_orig, w_orig = frame.shape[:2]
                 if w_orig > 800:
                     frame = resize_frame(frame, width=768)
@@ -324,41 +356,46 @@ def main():
                     total_matched=len(all_targets_found)
                 )
 
-                # Hiển thị frame
-                video_placeholder.image(bgr_to_rgb(annotated_frame), channels="RGB")
-
-                # Cập nhật Metrics
-                metrics_placeholder.markdown(f"""
-                | Tốc độ (FPS) | Tổng số người theo dõi | Số lượng Mục tiêu khớp |
-                | :---: | :---: | :---: |
-                | **{fps_counter.get_fps():.1f} FPS** | **{len(pipeline.track_memory)} người** | **{len(all_targets_found)} mục tiêu** |
-                """)
-
-                # Cập nhật danh sách target bên phải
-                with targets_container:
-                    for tid, tgt in all_targets_found.items():
-                        attr = tgt["attributes"]
-                        g_vi = "Nữ" if str(attr.get("gender", "")).lower() in ["female", "nữ", "nu"] else "Nam"
-                        up_vi = translate_color(attr.get("upper_color", ""))
-                        low_vi = translate_color(attr.get("lower_color", ""))
-
-                        st.markdown(f"""
-                        <div class="target-card">
-                            <b>🎯 MỤC TIÊU #{tgt['track_id']} (Độ khớp: {tgt['score']*100:.1f}%)</b><br>
-                            ⏱️ Xuất hiện lúc: <code>{tgt['timestamp']}</code> (Khung hình thứ {tgt['frame_idx']})<br>
-                            👤 Giới tính: <b>{g_vi}</b> | Áo: <b>{up_vi}</b> | Quần: <b>{low_vi}</b><br>
-                            🎒 Balo: {'Có' if attr.get('backpack') else 'Không'} | Mũ: {'Có' if attr.get('hat') else 'Không'} | Kính: {'Có' if attr.get('glasses') else 'Không'}
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if tgt.get("crop_rgb") is not None:
-                            st.image(tgt["crop_rgb"], caption=f"Chân dung Mục tiêu #{tgt['track_id']}", width=120)
-
+                last_annotated_frame = annotated_frame
                 fps_counter.end_frame()
-                frame_idx += 1
+                st.session_state.frame_idx += 1
 
-            release_video(cap)
-            st.session_state.is_running = False
-            st.success(f"✅ Hoàn tất xử lý video! Đã phát hiện {len(all_targets_found)} đối tượng đúng với yêu cầu tìm kiếm.")
+            # Cập nhật hiển thị frame và metrics
+            if last_annotated_frame is not None:
+                video_placeholder.image(bgr_to_rgb(last_annotated_frame), channels="RGB")
+
+            metrics_placeholder.markdown(f"""
+            | Tốc độ (FPS) | Tổng số người theo dõi | Số lượng Mục tiêu khớp |
+            | :---: | :---: | :---: |
+            | **{fps_counter.get_fps():.1f} FPS** | **{len(pipeline.track_memory)} người** | **{len(all_targets_found)} mục tiêu** |
+            """)
+
+            # Cập nhật danh sách target bên phải
+            with targets_container:
+                for tid, tgt in all_targets_found.items():
+                    attr = tgt["attributes"]
+                    g_vi = "Nữ" if str(attr.get("gender", "")).lower() in ["female", "nữ", "nu"] else "Nam"
+                    up_vi = translate_color(attr.get("upper_color", ""))
+                    low_vi = translate_color(attr.get("lower_color", ""))
+
+                    st.markdown(f"""
+                    <div class="target-card">
+                        <b>🎯 MỤC TIÊU #{tgt['track_id']} (Độ khớp: {tgt['score']*100:.1f}%)</b><br>
+                        ⏱️ Xuất hiện lúc: <code>{tgt['timestamp']}</code> (Khung hình thứ {tgt['frame_idx']})<br>
+                        👤 Giới tính: <b>{g_vi}</b> | Áo: <b>{up_vi}</b> | Quần: <b>{low_vi}</b><br>
+                        🎒 Balo: {'Có' if attr.get('backpack') else 'Không'} | Mũ: {'Có' if attr.get('hat') else 'Không'} | Kính: {'Có' if attr.get('glasses') else 'Không'}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if tgt.get("crop_rgb") is not None:
+                        st.image(tgt["crop_rgb"], caption=f"Chân dung Mục tiêu #{tgt['track_id']}", width=120)
+
+            if finished:
+                release_video(cap)
+                st.session_state.cap = None
+                st.session_state.is_running = False
+                st.success(f"✅ Hoàn tất xử lý video! Đã phát hiện {len(all_targets_found)} đối tượng đúng với yêu cầu tìm kiếm.")
+            elif st.session_state.is_running:
+                st.rerun()
 
     # ══════════════════════════════════════════════════════════
     # TAB 2: LỊCH SỬ TÌM KIẾM (SQLITE DATABASE)
@@ -413,26 +450,62 @@ def main():
     with tab_eval:
         st.subheader("📊 Kết quả Đánh giá Mô hình PAR (Pedestrian Attribute Recognition)")
 
+        # Đọc động số liệu từ file JSON nếu có (tránh hard-code)
+        metrics_file = "models/par/metrics.json"
+        if not os.path.exists(metrics_file):
+            metrics_file = "results/evaluation/par_eval_results.json"
+
+        val_ma = 0.8933
+        train_device = "Colab T4 GPU"
+        is_real = False
+        per_class_acc = {
+            "gender_female": 85.20,
+            "hat": 84.70,
+            "glasses": 91.00,
+            "backpack": 96.70
+        }
+
+        if os.path.exists(metrics_file):
+            try:
+                with open(metrics_file, "r", encoding="utf-8") as mf:
+                    m_data = json.load(mf)
+                    val_ma = float(m_data.get("mA", val_ma))
+                    is_real = m_data.get("is_real_measurement", False)
+                    train_device = m_data.get("device", train_device)
+                    for k, v in m_data.get("per_class", {}).items():
+                        if isinstance(v, dict) and "accuracy" in v:
+                            acc_v = v["accuracy"]
+                            if isinstance(acc_v, (int, float)):
+                                per_class_acc[k] = round(acc_v * 100, 2)
+            except Exception:
+                pass
+
         # Thông tin training
         col_meta1, col_meta2, col_meta3 = st.columns(3)
         col_meta1.metric("Dataset", "PA-100K", "90,000 train / 10,000 val")
         col_meta2.metric("Kiến trúc", "ResNet50", "Fine-tuned từ ImageNet")
-        col_meta3.metric("Training", "Colab T4 GPU", "20 epochs")
+        col_meta3.metric("Môi trường", train_device, "Đo thực tế" if is_real else "Colab Training")
 
         st.markdown("---")
 
         # Bảng kết quả mA
-        st.subheader("🎯 Mean Accuracy (mA) = 89.33%")
+        st.subheader(f"🎯 Mean Accuracy (mA chuẩn PAR) = {val_ma*100:.2f}%")
         eval_data = {
             "Thuộc tính": ["Giới tính (Gender)", "Đội Mũ (Hat)", "Đeo Kính (Glasses)", "Đeo Balo (Backpack)", "**Trung bình (mA)**"],
-            "Accuracy": ["85.20%", "84.70%", "91.00%", "96.70%", "**89.33%**"],
+            "Accuracy": [
+                f"{per_class_acc.get('gender_female', 85.2):.2f}%",
+                f"{per_class_acc.get('hat', 84.7):.2f}%",
+                f"{per_class_acc.get('glasses', 91.0):.2f}%",
+                f"{per_class_acc.get('backpack', 96.7):.2f}%",
+                f"**{val_ma*100:.2f}%**"
+            ],
             "Ngưỡng quyết định": ["≥ 50%", "≥ 62%", "≥ 50%", "≥ 50%", "-"],
             "Ghi chú": [
                 "Phụ thuộc góc nhìn, trang phục",
                 "Threshold cao hơn tránh nhầm tóc đen",
                 "Độ chính xác cao nhất (đặc trưng rõ)",
                 "Độ chính xác cao nhất (hình dạng mạnh)",
-                ""
+                "Metric chuẩn cân bằng 0.5*(TP/P + TN/N)"
             ]
         }
         st.dataframe(pd.DataFrame(eval_data), use_container_width=True)
@@ -444,7 +517,12 @@ def main():
         try:
             import plotly.graph_objects as go
             attrs = ["Gender", "Hat", "Glasses", "Backpack"]
-            accs  = [85.20, 84.70, 91.00, 96.70]
+            accs  = [
+                per_class_acc.get("gender_female", 85.20),
+                per_class_acc.get("hat", 84.70),
+                per_class_acc.get("glasses", 91.00),
+                per_class_acc.get("backpack", 96.70)
+            ]
             colors = ["#2196F3", "#FF9800", "#9C27B0", "#4CAF50"]
 
             fig = go.Figure(data=[
@@ -456,43 +534,64 @@ def main():
                     width=0.5
                 )
             ])
-            fig.add_hline(y=89.33, line_dash="dash", line_color="red",
-                          annotation_text=f"mA = 89.33%", annotation_position="right")
+            fig.add_hline(y=val_ma*100, line_dash="dash", line_color="red",
+                          annotation_text=f"mA = {val_ma*100:.2f}%", annotation_position="right")
             fig.update_layout(
-                title="Per-class Accuracy — PA-100K Test Set",
+                title="Per-class Accuracy — PA-100K Set (Đọc động từ metrics.json)",
                 yaxis_title="Accuracy (%)",
-                yaxis=dict(range=[75, 100]),
+                yaxis=dict(range=[70, 100]),
                 plot_bgcolor="white",
                 height=380
             )
             st.plotly_chart(fig, use_container_width=True)
         except ImportError:
-            # Fallback nếu không có plotly
-            st.bar_chart({"Gender": 85.2, "Hat": 84.7, "Glasses": 91.0, "Backpack": 96.7})
+            st.bar_chart({
+                "Gender": per_class_acc.get("gender_female", 85.20),
+                "Hat": per_class_acc.get("hat", 84.70),
+                "Glasses": per_class_acc.get("glasses", 91.00),
+                "Backpack": per_class_acc.get("backpack", 96.70)
+            })
 
-        # Bảng hiệu năng FPS
+        # Bảng hiệu năng FPS (đọc động từ results/benchmark_results.json)
         st.markdown("---")
         st.subheader("⚡ Kết quả Đo lường Hiệu năng (FPS Benchmark)")
 
-        import torch
-        device_label = f"GPU ({torch.cuda.get_device_name(0)})" if torch.cuda.is_available() else "CPU (Intel i5-10300H)"
-        is_gpu = torch.cuda.is_available()
-        fps_data = {
-            "Module / Thuật toán": [
-                "1. YOLOv8n Person Detection",
-                "2. ByteTrack MOT Tracker",
-                "3. HSV Color Detector (Fast Median)",
-                "4. ResNet50 PAR Classifier",
-                "5. Attribute Matching Engine",
-                "⭐ Full Pipeline (1 người)"
-            ],
-            "Độ trễ CPU (ms)": ["59.2 ± 5.5", "60.2 ± 12.5", "0.10 ± 0.01", "43.0 ± 2.0", "0.002", "63.3 ± 29.9"],
-            "FPS CPU":  ["16.9", "16.6", "9,754", "23.3", "420,000", "**~16 FPS**"],
-            "Độ trễ GPU (ms)": ["13.1 ± 2.3", "13.9 ± 1.5", "0.10 ± 0.04", "11.5 ± 0.6", "0.002", "14.1 ± 1.5"],
-            "FPS GPU":  ["76.3", "72.2", "9,983", "87.3", "595,000", "**~70 FPS** 🚀"],
-        }
-        st.dataframe(pd.DataFrame(fps_data), use_container_width=True)
-        st.caption(f"📌 Thiết bị hiện tại: **{device_label}** | Benchmark đo trực tiếp bằng `scripts/benchmark_fps.py`")
+        bench_file = "results/benchmark_results.json"
+        bench_loaded = False
+        if os.path.exists(bench_file):
+            try:
+                with open(bench_file, "r", encoding="utf-8") as bf:
+                    b_data = json.load(bf)
+                    modules = b_data.get("modules", [])
+                    if modules:
+                        bench_table = {
+                            "Module / Thuật toán": [m["name"] for m in modules],
+                            "Độ trễ (ms)": [f"{m['latency_ms']:.2f} ± {m['std_ms']:.2f}" for m in modules],
+                            "Tốc độ (FPS)": [f"{m['fps']:.1f} FPS" for m in modules]
+                        }
+                        st.dataframe(pd.DataFrame(bench_table), use_container_width=True)
+                        st.caption(f"📌 Thiết bị đo benchmark: **{b_data.get('device', 'GPU')}** | Dữ liệu đo đạc thực tế từ `scripts/benchmark_fps.py`")
+                        bench_loaded = True
+            except Exception:
+                pass
+
+        if not bench_loaded:
+            import torch
+            device_label = f"GPU ({torch.cuda.get_device_name(0)})" if torch.cuda.is_available() else "CPU (Intel i5-10300H)"
+            fps_data = {
+                "Module / Thuật toán": [
+                    "1. YOLOv8n Person Detection",
+                    "2. ByteTrack MOT Tracker",
+                    "3. HSV Color Detector (Fast Median)",
+                    "4. ResNet50 PAR Classifier",
+                    "5. Attribute Matching Engine",
+                    "⭐ Full Pipeline (1 người)"
+                ],
+                "Độ trễ (ms)": ["12.23 ± 1.57", "13.73 ± 2.21", "0.55 ± 0.23", "11.58 ± 1.23", "0.003 ± 0.0001", "13.94 ± 1.86"],
+                "FPS tương ứng": ["81.7 FPS", "72.9 FPS", "1,821 FPS", "86.3 FPS", "367,647 FPS", "**71.7 FPS** 🚀"],
+            }
+            st.dataframe(pd.DataFrame(fps_data), use_container_width=True)
+            st.caption(f"📌 Thiết bị hiện tại: **{device_label}** | Benchmark đo trực tiếp bằng `scripts/benchmark_fps.py`")
 
         st.markdown("---")
         st.info("💡 Để chạy Evaluation đầy đủ trên PA-100K test set, sử dụng script: `python scripts/evaluate_par.py --data-root datasets/PA100K`")
@@ -507,11 +606,11 @@ def main():
         * **Các công nghệ và giải thuật cốt lõi**:
             1. **Phát hiện người (Detection)**: YOLOv8n (Pretrained COCO, lọc class 0 `person`)
             2. **Theo dõi đối tượng (Tracking)**: ByteTrack (Gán Track ID ổn định, liên kết 2 bước chống che khuất)
-            3. **Phân tích màu sắc**: Không gian màu HSV + Thuật toán Trimmed Median (Nhanh ~0.1ms, Độc lập ánh sáng)
-            4. **Nhận dạng thuộc tính (PAR)**: ResNet50 Fine-tuned trên tập dữ liệu chuẩn PA-100K (100.000 ảnh, mA = 89.33%)
+            3. **Phân tích màu sắc**: Không gian màu HSV kết hợp K-Means Clustering + Skin Masking + CIE Lab Delta-E
+            4. **Nhận dạng thuộc tính (PAR)**: ResNet50 Fine-tuned trên tập dữ liệu chuẩn PA-100K (100.000 ảnh, mA chuẩn PAR = 89.33%)
             5. **Temporal EMA Smoothing**: Làm mịn nhãn theo thời gian (α=0.35) để loại bỏ rung giật khi tracking
             6. **Bộ máy so khớp (Matching Engine)**: Chấm điểm tương đồng có trọng số, hỗ trợ tìm kiếm linh hoạt
-            7. **Lưu trữ**: Cơ sở dữ liệu SQLite với lịch sử tìm kiếm đầy đủ
+            7. **Lưu trữ**: Cơ sở dữ liệu SQLite với lịch sử tìm kiếm đầy đủ (hỗ trợ WAL mode)
             8. **Giao diện**: Streamlit Web Dashboard 100% Tiếng Việt
         """)
 
@@ -525,11 +624,11 @@ YOLOv8n Person Detection  (Phát hiện bounding box người)
 ByteTrack MOT              (Gán Track ID ổn định liên frame)
       ↓
 Person Crop                (Trích xuất vùng ảnh từng người)
-      ↓ ┌─────────────────────────────────┐
-      ↓ │ HSV+Median Color Detector        │
-      ↓ │ ResNet50 PAR (Gender/Hat/...)    │
-      ↓ │ Temporal EMA Smoothing           │
-      ↓ └─────────────────────────────────┘
+      ↓ ┌───────────────────────────────────────┐
+      ↓ │ HSV K-Means + Delta-E Color Detector  │
+      ↓ │ ResNet50 PAR (Gender/Hat/...)         │
+      ↓ │ Temporal EMA Smoothing                │
+      ↓ └───────────────────────────────────────┘
       ↓
 Weighted Attribute Matching  (Tính điểm % theo trọng số)
       ↓

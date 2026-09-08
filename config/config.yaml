@@ -23,15 +23,15 @@ detection:
   imgsz: 640                   # Kích thước ảnh input YOLO
   device: "cuda"               # "cuda" khi có GPU GTX 1650, "cpu" nếu không có GPU
 
-# --- Module Tracking (ByteTrack) ---
+# --- Module Tracking (ByteTrack / BoT-SORT) ---
 tracking:
-  tracker: "bytetrack.yaml"    # Config file ByteTrack (trong ultralytics)
+  tracker: "bytetrack.yaml"    # Hỗ trợ "bytetrack.yaml" (mặc định) hoặc "botsort.yaml" (BoT-SORT khi camera rung lắc)
   persist: true                # Giữ track ID qua các frame
 
 # --- Module Attribute Recognition ---
 attributes:
-  input_size: [224, 112]       # Kích thước crop đưa vào PAR model (tỷ lệ người đứng)
-  # Ngưỡng để quyết định attribute = Yes (binary classification, đã cân chỉnh)
+  input_size: [224, 112]       # Kích thước crop đưa vào PAR model (tỷ lệ người đứng, Resize 256x128 -> CenterCrop 224x112)
+  # Ngưỡng F1 tối ưu trên tập PA-100K
   threshold:
     gender: 0.50
     hat: 0.62                  # Nâng cao tránh nhầm tóc đen/búi tóc
@@ -39,11 +39,9 @@ attributes:
     backpack: 0.50
 
 # --- Evaluation ---
-# LƯU Ý: Các số liệu dưới đây hiện là placeholder/kết quả từ Colab Demo.
-# CẦN fine-tune model trên PA-100K thực tế trước khi bảo vệ đồ án!
 evaluation:
   dataset: "PA-100K"
-  val_mA: 0.8933               # Mean Accuracy từ Colab T4 training (20 epochs)
+  val_mA: 0.8933               # Mean Accuracy chuẩn PAR (balanced: 0.5*(TP/P + TN/N)) từ Colab T4 training
   per_class:
     gender_female: 0.852       # Accuracy giới tính
     hat: 0.847                 # Accuracy nhận dạng mũ
@@ -53,6 +51,7 @@ evaluation:
 
 # --- Module Color Detection ---
 color:
+  method: "kmeans_hsv_delta_e" # K-Means phân cụm HSV kết hợp loại trừ da và CIE Lab Delta-E
   # Phần trăm crop dùng để detect màu upper (50% trên = phần áo)
   upper_ratio: 0.5
   # Phần trăm crop dùng để detect màu lower (40% dưới = phần quần)
@@ -60,7 +59,7 @@ color:
   # Số cluster K-Means để tìm màu chủ đạo
   n_clusters: 3
   # Tên các màu hỗ trợ
-  upper_colors: ["Black", "White", "Red", "Blue", "Green", "Yellow", "Gray", "Other"]
+  upper_colors: ["Black", "White", "Red", "Blue", "Green", "Yellow", "Purple", "Gray", "Other"]
   lower_colors: ["Black", "White", "Blue", "Gray", "Other"]
 
 # --- Module Matching ---

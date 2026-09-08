@@ -61,6 +61,25 @@ def open_video(source):
     return cap, info
 
 
+def open_video_robust(source, max_retries: int = 5, backoff: float = 1.5):
+    """
+    Mở nguồn video với cơ chế retry và exponential backoff (hữu ích cho RTSP / IP camera).
+    """
+    last_err = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            cap, info = open_video(source)
+            if cap is not None and cap.isOpened():
+                return cap, info
+        except Exception as e:
+            last_err = e
+
+        wait_time = backoff * (2 ** (attempt - 1))
+        time.sleep(min(wait_time, 10.0))
+
+    raise ConnectionError(f"Không thể kết nối tới nguồn video '{source}' sau {max_retries} lần thử: {last_err}")
+
+
 def read_frame(cap):
     """
     Đọc một frame từ video.

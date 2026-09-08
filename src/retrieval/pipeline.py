@@ -54,24 +54,9 @@ from src.utils.logger import get_logger
 logger = get_logger("pipeline")
 
 
-TRACK_MEMORY_TTL_FRAMES = 300      # ~10-12s ở 25-30fps: track vắng mặt lâu hơn mức này sẽ bị xóa
+TRACK_MEMORY_TTL_FRAMES = 300      # ~10-12s ở 25-30fps: track vắng mặt lâu hơn mức này sẽ chuyển sang ghost
 TRACK_MEMORY_MAX_SIZE = 500        # chặn trên tuyệt đối, phòng trường hợp fps rất cao / video rất dài
 
-def _evict_stale_tracks(track_memory: dict, frame_idx: int):
-    """Xóa các track_id không được cập nhật trong TRACK_MEMORY_TTL_FRAMES frame gần nhất."""
-    stale_ids = [
-        tid for tid, mem in track_memory.items()
-        if frame_idx - mem["last_updated"] > TRACK_MEMORY_TTL_FRAMES
-    ]
-    for tid in stale_ids:
-        track_memory.pop(tid, None)
-
-    # Chặn trên cứng: nếu vẫn còn quá nhiều, xóa bớt các track cũ nhất theo last_updated.
-    if len(track_memory) > TRACK_MEMORY_MAX_SIZE:
-        by_age = sorted(track_memory.items(), key=lambda kv: kv[1]["last_updated"])
-        n_to_drop = len(track_memory) - TRACK_MEMORY_MAX_SIZE
-        for tid, _ in by_age[:n_to_drop]:
-            track_memory.pop(tid, None)
 
 class PersonRetrievalPipeline:
     """
@@ -84,7 +69,7 @@ class PersonRetrievalPipeline:
         par_weights_path: str = "models/par/par_resnet50.pth",
         device: str = None,
         confidence_threshold: float = 0.4,
-        matching_threshold: float = 0.7,
+        matching_threshold: float = 0.5,
         attribute_update_interval: int = 5 # Tối ưu hóa: Phân tích lại thuộc tính mỗi 5 frames cho mỗi ID
     ):
         logger.info("Đang khởi tạo toàn bộ các module trong Pipeline...")
@@ -93,7 +78,7 @@ class PersonRetrievalPipeline:
         self.matching_threshold = matching_threshold
         self.attr_interval = attribute_update_interval
 
-        # 1. Khởi tạo Tracker (ByteTrack + YOLO)
+        # 1. Khởi tạo Tracker (ByteTrack/BoT-SORT + YOLO)
         self.tracker = PersonTracker(
             model_path=yolo_model_path,
             confidence_threshold=confidence_threshold,
@@ -115,9 +100,10 @@ class PersonRetrievalPipeline:
         # 5. Khởi tạo Database Manager
         self.db = DatabaseManager()
 
-        # Bộ nhớ đệm lưu thuộc tính của từng Track ID (tránh chạy ResNet liên tục mỗi frame trên cùng 1 người)
-        # track_id -> {"attributes": dict, "last_updated": int, "matched": bool, "score": float}
+        # Bộ nhớ đệm lưu thuộc tính của từng Track ID
         self.track_memory = {}
+        # Ghost tracks: lưu các track vừa bị evict gần đây để hỗ trợ kế thừa khi bị ID-switch
+        self.ghost_tracks = {}
 
         logger.info("Pipeline đã sẵn sàng hoạt động!")
 
@@ -125,6 +111,50 @@ class PersonRetrievalPipeline:
         """Reset trạng thái bộ nhớ cho lượt tìm kiếm mới."""
         self.tracker.reset()
         self.track_memory.clear()
+        self.ghost_tracks.clear()
+
+    def _try_inherit_ghost(self, new_track_id: int, frame_idx: int) -> bool:
+        """Track mới xuất hiện → thử kế thừa smooth_probs từ ghost gần nhất (< 60 frames ~ 2s)."""
+        if not self.ghost_tracks:
+            return False
+        best_id = max(self.ghost_tracks, key=lambda tid: self.ghost_tracks[tid]["last_updated"])
+        ghost = self.ghost_tracks[best_id]
+        if frame_idx - ghost["last_updated"] <= 60:
+            self.track_memory[new_track_id] = {
+                **ghost,
+                "last_updated": frame_idx,
+                "inherited_from": best_id,
+                "crop": None,
+            }
+            self.ghost_tracks.pop(best_id, None)
+            return True
+        return False
+
+    def _evict_stale_tracks(self, frame_idx: int):
+        """Xóa các track_id không được cập nhật; chuyển vào ghost_tracks để hỗ trợ kế thừa."""
+        stale_ids = [
+            tid for tid, mem in self.track_memory.items()
+            if frame_idx - mem["last_updated"] > TRACK_MEMORY_TTL_FRAMES
+        ]
+        for tid in stale_ids:
+            mem = self.track_memory.pop(tid, None)
+            if mem:
+                mem["crop"] = None
+                self.ghost_tracks[tid] = mem
+
+        if len(self.track_memory) > TRACK_MEMORY_MAX_SIZE:
+            by_age = sorted(self.track_memory.items(), key=lambda kv: kv[1]["last_updated"])
+            n_to_drop = len(self.track_memory) - TRACK_MEMORY_MAX_SIZE
+            for tid, mem in by_age[:n_to_drop]:
+                self.track_memory.pop(tid, None)
+                mem["crop"] = None
+                self.ghost_tracks[tid] = mem
+
+        # Giữ tối đa 50 ghost gần nhất
+        if len(self.ghost_tracks) > 50:
+            oldest_ghosts = sorted(self.ghost_tracks.items(), key=lambda kv: kv[1]["last_updated"])
+            for tid, _ in oldest_ghosts[: len(self.ghost_tracks) - 50]:
+                self.ghost_tracks.pop(tid, None)
 
     def process_frame(
         self,
@@ -137,7 +167,7 @@ class PersonRetrievalPipeline:
 
         # Dọn dẹp định kỳ (rẻ, chỉ duyệt dict) để tránh memory leak trên video dài
         if frame_idx % 50 == 0:
-            _evict_stale_tracks(self.track_memory, frame_idx)
+            self._evict_stale_tracks(frame_idx)
 
         tracked_objects = self.tracker.track(frame, persist=True)
 
@@ -151,6 +181,10 @@ class PersonRetrievalPipeline:
         for obj in tracked_objects:
             track_id = obj["track_id"]
             mem = self.track_memory.get(track_id)
+            if mem is None:
+                # Thử kế thừa thuộc tính từ ghost track khi bị đổi ID
+                if self._try_inherit_ghost(track_id, frame_idx):
+                    mem = self.track_memory.get(track_id)
             if mem is None:
                 candidates.append((float("inf"), obj))  # track mới toanh -> ưu tiên tuyệt đối
                 continue
@@ -216,6 +250,9 @@ class PersonRetrievalPipeline:
                     is_match, score, breakdown = self.matcher.is_match(target_query, attrs, threshold=thresh)
                     obs_count = (prev.get("obs_count", 0) + 1) if prev else 1
 
+                    # Lưu thumbnail nhỏ (96x192) trong RAM thay vì giữ ảnh full resolution
+                    thumb = cv2.resize(crop, (96, 192)) if (is_match and crop is not None and crop.size > 0) else None
+
                     self.track_memory[track_id] = {
                         "attributes": attrs,
                         "smooth_probs": smooth,
@@ -224,9 +261,7 @@ class PersonRetrievalPipeline:
                         "matched": is_match,
                         "score": score,
                         "breakdown": breakdown,
-                        # Không giữ ảnh crop full-res mãi trong RAM; chỉ giữ crop khi vừa match
-                        # để ghi ra đĩa ngay trong run_on_video, có thể giải phóng ngay sau đó.
-                        "crop": crop if is_match else None,
+                        "crop": thumb,
                     }
 
         # --- Bước 3: vẽ + gom kết quả (đọc từ cache, không phân tích lại) ---
@@ -333,6 +368,9 @@ class PersonRetrievalPipeline:
                     crop_full_path = os.path.join(save_crops_dir, crop_filename)
                     if t["crop"] is not None and t["crop"].size > 0:
                         cv2.imwrite(crop_full_path, t["crop"])
+                        # Giải phóng ngay crop khỏi RAM
+                        if tid in self.track_memory:
+                            self.track_memory[tid]["crop"] = None
 
                     all_unique_targets_found[tid] = {
                         "track_id": tid,

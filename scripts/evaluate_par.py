@@ -36,6 +36,11 @@ import numpy as np
 import datetime
 from pathlib import Path
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.attributes.par_model import AttributeRecognizer
@@ -193,33 +198,42 @@ def evaluate_on_dataset(data_root: str, max_samples: int = None) -> dict:
             eta = elapsed / (idx + 1) * (len(test_images) - idx - 1)
             logger.info(f"  [{idx+1}/{len(test_images)}] ETA: {eta:.0f}s")
 
-    # Tính metrics
+    # Tính metrics chuẩn PAR (Li et al., PA-100K)
     metrics = {}
+    balanced_accs = []
     accuracies = []
 
     for attr, counts in results.items():
         tp, fp, fn, tn = counts["TP"], counts["FP"], counts["FN"], counts["TN"]
         total = tp + fp + fn + tn
+        p = tp + fn
+        n = fp + tn
         acc = (tp + tn) / total if total > 0 else 0
         prec = tp / (tp + fp) if (tp + fp) > 0 else 0
-        rec = tp / (tp + fn) if (tp + fn) > 0 else 0
+        rec = tp / p if p > 0 else 0
         f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0
+        # mA chuẩn PAR là trung bình cộng của Balanced Accuracy từng thuộc tính: 0.5 * (TP/P + TN/N)
+        b_acc = 0.5 * ((tp / p if p > 0 else 0) + (tn / n if n > 0 else 0))
 
         metrics[attr] = {
             "accuracy": round(acc, 4),
+            "balanced_accuracy": round(b_acc, 4),
             "precision": round(prec, 4),
             "recall": round(rec, 4),
             "f1": round(f1, 4),
             "TP": tp, "FP": fp, "FN": fn, "TN": tn
         }
         accuracies.append(acc)
+        balanced_accs.append(b_acc)
 
-    mA = round(float(np.mean(accuracies)), 4)
+    # mA chuẩn học thuật cho PAR
+    mA = round(float(np.mean(balanced_accs)), 4)
 
     return {
         "source": "live_evaluation",
         "n_samples": n_processed,
         "mA": mA,
+        "raw_accuracy_mean": round(float(np.mean(accuracies)), 4),
         "per_class": metrics
     }
 
@@ -336,6 +350,16 @@ def save_results_json(results: dict, output_path: str):
         json.dump(json_data, f, ensure_ascii=False, indent=4)
         
     logger.info(f"Đã lưu kết quả JSON ra: {output_path}")
+
+    # Ghi thêm vào models/par/metrics.json để app.py và các script khác đọc trực tiếp
+    par_metrics_path = "models/par/metrics.json"
+    try:
+        os.makedirs(os.path.dirname(par_metrics_path), exist_ok=True)
+        with open(par_metrics_path, "w", encoding="utf-8") as f:
+            json.dump(json_data, f, ensure_ascii=False, indent=4)
+        logger.info(f"Đã đồng bộ kết quả ra: {par_metrics_path}")
+    except Exception as e:
+        logger.warning(f"Không thể ghi {par_metrics_path}: {e}")
 
 
 def main():
