@@ -26,6 +26,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.retrieval.pipeline import PersonRetrievalPipeline
+from src.utils.config_loader import load_config
 
 
 def create_realistic_demo_video(output_path="data/test_videos/demo_search_video.mp4", num_frames=60):
@@ -81,7 +82,7 @@ def main():
     parser.add_argument("--backpack", type=str, default="Yes", choices=["Yes", "No", "Any"], help="Có đeo balo không")
     parser.add_argument("--hat", type=str, default="Any", choices=["Yes", "No", "Any"], help="Có đội mũ không")
     parser.add_argument("--glasses", type=str, default="Any", choices=["Yes", "No", "Any"], help="Có đeo kính không")
-    parser.add_argument("--threshold", type=float, default=0.70, help="Ngưỡng tương đồng (0.5 -> 1.0)")
+    parser.add_argument("--threshold", type=float, default=None, help="Ngưỡng tương đồng (0.5 -> 1.0). Ghi đè config.yaml nếu cung cấp.")
     parser.add_argument("--max-frames", type=int, default=60, help="Số frames tối đa để xử lý")
     parser.add_argument("--display", action="store_true", help="Hiển thị cửa sổ video trực tiếp khi xử lý")
 
@@ -106,6 +107,10 @@ def main():
         "glasses": parse_bool_choice(args.glasses)
     }
 
+    # Đọc cấu hình
+    config = load_config()
+    final_threshold = args.threshold if args.threshold is not None else config.get("matching", {}).get("default_threshold", 0.70)
+
     print("\n[THÔNG TIN TRUY VẤN TÌM KIẾM]")
     print(f"  • Giới tính : {query['gender']}")
     print(f"  • Màu áo    : {query['upper_color']}")
@@ -113,14 +118,14 @@ def main():
     print(f"  • Balo      : {args.backpack}")
     print(f"  • Đội mũ    : {args.hat}")
     print(f"  • Đeo kính  : {args.glasses}")
-    print(f"  • Ngưỡng    : {args.threshold * 100:.0f}%\n")
+    print(f"  • Ngưỡng    : {final_threshold * 100:.0f}%\n")
 
     if not os.path.exists(args.video):
         print(f"[*] Đang tạo video mẫu thử nghiệm tại: {args.video}")
         create_realistic_demo_video(args.video)
 
     # Khởi tạo và chạy Pipeline
-    pipeline = PersonRetrievalPipeline(matching_threshold=args.threshold)
+    pipeline = PersonRetrievalPipeline(matching_threshold=final_threshold)
 
     output_video = "results/retrieval_output.mp4"
     csv_log = "results/logs/retrieval_results.csv"
@@ -130,7 +135,7 @@ def main():
         target_query=query,
         output_video_path=output_video,
         save_csv_log=csv_log,
-        threshold=args.threshold,
+        threshold=final_threshold,
         max_frames=args.max_frames,
         display=args.display
     )

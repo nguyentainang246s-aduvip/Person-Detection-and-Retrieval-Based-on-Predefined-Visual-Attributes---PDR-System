@@ -147,8 +147,15 @@ class PersonTracker:
         Reset trạng thái bộ nhớ tracking an toàn (dùng khi chuyển sang video mới hoặc dừng tìm kiếm).
         """
         try:
-            # Tái tạo lại YOLO predictor thay vì gán list rỗng
-            self.model = YOLO(self.model_path)
+            # P1-2: Tránh load lại weights từ đĩa gây bottleneck (tiết kiệm hàng trăm ms)
+            if hasattr(self.model, 'predictor') and self.model.predictor is not None:
+                # Ultralytics sẽ tự tạo lại predictor và tracker mới khi predict ở frame tiếp theo
+                self.model.predictor = None
+            else:
+                self.model = YOLO(self.model_path)
         except Exception:
-            pass
+            try:
+                self.model = YOLO(self.model_path)
+            except Exception:
+                pass
         logger.info("Đã reset trạng thái Tracker thành công.")

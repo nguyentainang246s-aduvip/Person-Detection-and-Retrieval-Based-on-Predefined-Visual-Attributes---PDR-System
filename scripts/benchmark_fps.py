@@ -13,6 +13,8 @@ CÁCH CHẠY:
 import sys
 import os
 import time
+import json
+import datetime
 import torch
 import numpy as np
 import cv2
@@ -110,6 +112,31 @@ def run_all_benchmarks():
     print("\n💡 GHI CHÚ BÁO CÁO:")
     print("  • Bảng số liệu trên có thể copy trực tiếp vào Chương 4 (Thực nghiệm & Đánh giá) của ĐATN.")
     print("  • Với cơ chế Caching thuộc tính (chỉ chạy ResNet mỗi 5 frames), Full Pipeline duy trì tốc độ realtime mượt mà.")
+
+    # P0-1: Lưu kết quả ra JSON
+    results_dir = "results"
+    os.makedirs(results_dir, exist_ok=True)
+    json_path = os.path.join(results_dir, "benchmark_results.json")
+    
+    device_name = "cuda (" + torch.cuda.get_device_name(0) + ")" if device == "cuda" else "cpu"
+    
+    benchmark_data = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "device": device_name,
+        "modules": [
+            {"name": "YOLOv8 Detection", "latency_ms": round(t_det, 2), "std_ms": round(s_det, 2), "fps": round(fps_det, 1)},
+            {"name": "ByteTrack MOT", "latency_ms": round(t_trk, 2), "std_ms": round(s_trk, 2), "fps": round(fps_trk, 1)},
+            {"name": "K-Means Color HSV", "latency_ms": round(t_col, 2), "std_ms": round(s_col, 2), "fps": round(fps_col, 1)},
+            {"name": "ResNet50 PAR", "latency_ms": round(t_par, 2), "std_ms": round(s_par, 2), "fps": round(fps_par, 1)},
+            {"name": "Attribute Matching Engine", "latency_ms": round(t_mat, 4), "std_ms": round(s_mat, 4), "fps": round(fps_mat, 1)},
+            {"name": "Overall Pipeline", "latency_ms": round(t_pip, 2), "std_ms": round(s_pip, 2), "fps": round(fps_pip, 1)}
+        ]
+    }
+    
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(benchmark_data, f, ensure_ascii=False, indent=4)
+        
+    print(f"\n[INFO] Đã lưu kết quả benchmark ra file: {json_path}")
 
 
 if __name__ == "__main__":

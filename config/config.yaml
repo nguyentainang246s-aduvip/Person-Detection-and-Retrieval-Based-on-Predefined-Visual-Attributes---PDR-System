@@ -39,6 +39,8 @@ attributes:
     backpack: 0.50
 
 # --- Evaluation ---
+# LƯU Ý: Các số liệu dưới đây hiện là placeholder/kết quả từ Colab Demo.
+# CẦN fine-tune model trên PA-100K thực tế trước khi bảo vệ đồ án!
 evaluation:
   dataset: "PA-100K"
   val_mA: 0.8933               # Mean Accuracy từ Colab T4 training (20 epochs)
@@ -63,7 +65,7 @@ color:
 
 # --- Module Matching ---
 matching:
-  default_threshold: 0.7       # Ngưỡng điểm matching mặc định (70%)
+  default_threshold: 0.99      # Ngưỡng điểm matching mặc định (70%)
 
 # --- Video Processing ---
 video:

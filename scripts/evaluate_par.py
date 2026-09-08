@@ -29,9 +29,11 @@ CÁCH SỬ DỤNG:
 import os
 import sys
 import csv
+import json
 import time
 import argparse
 import numpy as np
+import datetime
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -299,6 +301,29 @@ def save_results_csv(results: dict, output_path: str):
     logger.info(f"Đã lưu kết quả evaluation ra: {output_path}")
 
 
+def save_results_json(results: dict, output_path: str):
+    """Lưu kết quả ra JSON format cho báo cáo."""
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    import torch
+    device_name = "cuda (" + torch.cuda.get_device_name(0) + ")" if torch.cuda.is_available() else "cpu"
+    if results.get("source") == "colab":
+        device_name = "Colab T4 GPU (Demo)"
+
+    json_data = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "device": device_name,
+        "is_real_measurement": results.get("source") != "colab",
+        "mA": results.get("mA") or results.get("overall", {}).get("val_mA", 0),
+        "per_class": results.get("per_class", {})
+    }
+    
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, ensure_ascii=False, indent=4)
+        
+    logger.info(f"Đã lưu kết quả JSON ra: {output_path}")
+
+
 def main():
     print_banner()
 
@@ -336,8 +361,15 @@ def main():
             }
         }
         save_results_csv(colab_csv, args.output)
+        
+        json_output = args.output.replace(".csv", ".json")
+        if json_output == args.output:
+            json_output = args.output + ".json"
+        
+        colab_csv["source"] = "colab"
+        save_results_json(colab_csv, json_output)
 
-        print(f"\n  [INFO] Kết quả đã lưu ra: {args.output}")
+        print(f"\n  [INFO] Kết quả đã lưu ra: {args.output} và {json_output}")
         print(f"  [INFO] Để chạy trên PA-100K test set thực: tải dataset về datasets/PA100K/")
         print(f"  [INFO] Sau đó chạy lại: python scripts/evaluate_par.py --data-root datasets/PA100K\n")
         return
@@ -353,9 +385,15 @@ def main():
 
     print_results_table(results, source="live")
     save_results_csv(results, args.output)
+    
+    json_output = args.output.replace(".csv", ".json")
+    if json_output == args.output:
+        json_output = args.output + ".json"
+    save_results_json(results, json_output)
 
     print(f"\n  [✓] Evaluation hoàn tất!")
-    print(f"  [✓] Kết quả CSV: {args.output}\n")
+    print(f"  [✓] Kết quả CSV : {args.output}")
+    print(f"  [✓] Kết quả JSON: {json_output}\n")
 
 
 if __name__ == "__main__":

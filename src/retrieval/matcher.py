@@ -1,25 +1,28 @@
 """
-Đề xuất cải tiến cho src/retrieval/matcher.py
-==============================================
-Thay đổi chính so với bản gốc:
-1. So khớp màu theo kiểu "soft" (điểm 1.0 nếu trùng khớp, 0.5 nếu là màu "hàng xóm"
-   trong không gian màu, 0.0 nếu khác hẳn) để giảm việc điểm số sụp về 0 chỉ vì
-   ColorDetector lệch biên (Navy bị đọc thành Black chẳng hạn).
-2. Bọc str() an toàn hơn, tránh crash nếu query truyền vào không phải string.
-3. Thêm tham số min_confidence để loại bỏ các thuộc tính PAR có độ tin cậy quá thấp
-   khỏi phép tính điểm (tránh một prediction "yếu" kéo điểm xuống oan).
+src/retrieval/matcher.py
+========================
+Bộ so khớp (Matching Engine) để đánh giá độ tương đồng giữa đặc điểm người dùng truy vấn (Query) và các thuộc tính trích xuất từ khung hình.
+
+TÍNH NĂNG CHÍNH:
+    - Cơ chế Soft-Matching: Áp dụng mức điểm dung sai cho các màu sắc gần nhau (ví dụ: Xám và Trắng) để bù đắp sai số của Camera thay vì tính đúng/sai tuyệt đối.
+    - Weighted Scoring: Đánh giá độ tương đồng (%) theo trọng số tầm quan trọng (vd: màu áo quan trọng hơn đeo kính).
+    - Confidence Filtering: Bỏ qua các đặc điểm nhận dạng nếu độ tin cậy của AI quá thấp (tránh kéo tụt điểm số oan).
 """
 
 from src.utils.logger import get_logger
 
 logger = get_logger("matcher")
 
-# Các nhóm màu được coi là "gần nhau" -> phạt nhẹ thay vì phạt hoàn toàn
+# Các nhóm màu được coi là "gần nhau" -> phạt nhẹ thay vì phạt hoàn toàn không khớp
+# TODO: Giá trị tạm thời (sensible defaults), CHƯA hiệu chỉnh bằng dữ liệu thật. 
+# Cần chạy video test có gán nhãn thực tế để tinh chỉnh ma trận nhầm lẫn màu sắc này.
 COLOR_NEIGHBORS = {
-    "black": {"gray", "blue"},   # navy/xanh đậm hay bị đọc lẫn Black/Blue
-    "gray": {"black", "white"},
-    "blue": {"black", "purple"},
+    "black": {"gray", "blue", "purple"}, # Áo xanh đậm, tím sẫm rất hay bị nhận nhầm là đen do thiếu sáng
+    "gray": {"black", "white", "blue"},
+    "blue": {"black", "gray", "purple"},
     "white": {"gray"},
+    "yellow": {"red"},
+    "red": {"yellow", "purple"}
 }
 
 
@@ -34,7 +37,7 @@ class AttributeMatcher:
     }
 
     def __init__(self, weights: dict = None, default_threshold: float = 0.7,
-                 min_confidence: float = 0.55, soft_color_score: float = 0.5):
+                 min_confidence: float = 0.55, soft_color_score: float = 0.4):
         self.weights = weights or self.DEFAULT_WEIGHTS
         self.default_threshold = default_threshold
         # Ngưỡng tin cậy tối thiểu để 1 thuộc tính PAR được tính vào điểm số

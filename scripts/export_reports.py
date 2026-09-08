@@ -1,5 +1,6 @@
 import os
 import datetime
+import json
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
@@ -39,6 +40,37 @@ def generate_docx_report(output_dir):
     p4.add_run('Batch Inference: ').bold = True
     p4.add_run('Hỗ trợ PyTorch batching cho ResNet50, giảm overhead của Python khi chạy nhiều crop cùng một frame.')
     
+    # Inject actual metrics if available
+    eval_file = "results/evaluation/par_eval_results.json"
+    if os.path.exists(eval_file):
+        with open(eval_file, "r", encoding="utf-8") as f:
+            eval_data = json.load(f)
+        doc.add_heading('3. Đánh giá độ chính xác (Metrics)', level=1)
+        
+        if not eval_data.get('is_real_measurement', True):
+            p_warn = doc.add_paragraph()
+            p_warn.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            run_warn = p_warn.add_run("⚠️ SỐ LIỆU DEMO — CHƯA ĐO THẬT ⚠️")
+            run_warn.bold = True
+            run_warn.font.color.rgb = RGBColor(255, 0, 0)
+            run_warn.font.size = Pt(16)
+
+        doc.add_paragraph(f"Đánh giá trên thiết bị: {eval_data.get('device', 'Unknown')}")
+        mA = eval_data.get('mA', 0)
+        doc.add_paragraph(f"Mean Accuracy (mA) trên PA-100K test set đạt {mA*100:.2f}%.")
+        
+        table = doc.add_table(rows=1, cols=2)
+        table.style = 'Table Grid'
+        hdr_cells = table.rows[0].cells
+        hdr_cells[0].text = 'Thuộc tính'
+        hdr_cells[1].text = 'Accuracy (%)'
+        
+        per_class = eval_data.get('per_class', {})
+        for attr, vals in per_class.items():
+            row_cells = table.add_row().cells
+            row_cells[0].text = attr
+            row_cells[1].text = f"{vals.get('accuracy', 0)*100:.2f}%"
+
     file_path = os.path.join(output_dir, 'PDR_Audit_Report.docx')
     doc.save(file_path)
     return file_path
@@ -96,6 +128,14 @@ def generate_pptx_slides(output_dir):
     return file_path
 
 def generate_xlsx_dashboard(output_dir):
+    # P0-1: Đọc dữ liệu benchmark từ file JSON thực tế
+    benchmark_file = "results/benchmark_results.json"
+    if not os.path.exists(benchmark_file):
+        raise FileNotFoundError(f"Chưa có số liệu đo đạc thực tế. Vui lòng chạy 'python scripts/benchmark_fps.py' để tạo {benchmark_file} trước khi xuất báo cáo.")
+        
+    with open(benchmark_file, "r", encoding="utf-8") as f:
+        bench_data = json.load(f)
+        
     file_path = os.path.join(output_dir, 'PDR_Evaluation_Dashboard.xlsx')
     workbook = xlsxwriter.Workbook(file_path)
     worksheet = workbook.add_worksheet('System Metrics')
@@ -109,19 +149,38 @@ def generate_xlsx_dashboard(output_dir):
         worksheet.write(0, col, h, header_fmt)
         worksheet.set_column(col, col, 25)
     
-    # Write Data
+    # Đọc data từ JSON map vào bảng
+    # Cấu trúc: [Name, latency_ms, optimization_note, expected_fps_string]
+    # Dùng list các dict từ json_data["modules"]
+    modules = bench_data.get("modules", [])
+    
+    def get_latency(mod_name, default=0.0):
+        for m in modules:
+            if mod_name.lower() in m["name"].lower():
+                return m.get("latency_ms", default)
+        return default
+        
     data = [
-        ['YOLOv8 Detection', 12.5, 'TensorRT / Half Precision', '30 FPS'],
-        ['ByteTrack MOT', 2.1, 'Matrix Operations', '30 FPS'],
-        ['K-Means Color HSV', 0.8, 'Crop ROI xám hóa (Gray-world)', '> 60 FPS'],
-        ['ResNet50 PAR', 11.2, 'Batch Inference (2 crops/batch)', '25 FPS'],
-        ['Overall Pipeline', 26.6, 'Load Budgeting (Limit 2 CNN)', 'Real-time (25+ FPS)']
+        ['YOLOv8 Detection', get_latency("YOLOv8"), 'TensorRT / Half Precision', '30 FPS'],
+        ['ByteTrack MOT', get_latency("ByteTrack"), 'Matrix Operations', '30 FPS'],
+        ['K-Means Color HSV', get_latency("Color"), 'Crop ROI xám hóa (Gray-world)', '> 60 FPS'],
+        ['ResNet50 PAR', get_latency("ResNet50"), 'Batch Inference (2 crops/batch)', '25 FPS'],
+        ['Overall Pipeline', get_latency("Pipeline"), 'Load Budgeting (Limit 2 CNN)', 'Real-time (25+ FPS)']
     ]
     
     for row_idx, row_data in enumerate(data, start=1):
         for col_idx, cell_data in enumerate(row_data):
             worksheet.write(row_idx, col_idx, cell_data)
             
+    # Inject actual metrics if available to check if demo
+    eval_file = "results/evaluation/par_eval_results.json"
+    if os.path.exists(eval_file):
+        with open(eval_file, "r", encoding="utf-8") as f:
+            eval_data = json.load(f)
+        if not eval_data.get('is_real_measurement', True):
+            warn_fmt = workbook.add_format({'bold': True, 'font_color': 'red', 'font_size': 14})
+            worksheet.merge_range('A7:E7', "⚠️ SỐ LIỆU DEMO — CHƯA ĐO THẬT ⚠️", warn_fmt)
+
     # Chart
     chart = workbook.add_chart({'type': 'column'})
     chart.add_series({
@@ -129,7 +188,7 @@ def generate_xlsx_dashboard(output_dir):
         'categories': ['System Metrics', 1, 0, 5, 0],
         'values': ['System Metrics', 1, 1, 5, 1],
     })
-    chart.set_title({'name': 'Độ trễ xử lý theo từng module'})
+    chart.set_title({'name': f'Độ trễ xử lý theo từng module ({bench_data.get("device", "Unknown")})'})
     chart.set_y_axis({'name': 'Milliseconds (ms)'})
     worksheet.insert_chart('A9', chart)
     

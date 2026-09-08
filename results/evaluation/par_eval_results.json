@@ -1,0 +1,48 @@
+{
+    "timestamp": "2026-09-08T15:42:22.311797",
+    "device": "Colab T4 GPU (Demo)",
+    "is_real_measurement": false,
+    "mA": 0.8933,
+    "per_class": {
+        "gender_female": {
+            "accuracy": 0.852,
+            "precision": "-",
+            "recall": "-",
+            "f1": "-",
+            "TP": "-",
+            "FP": "-",
+            "FN": "-",
+            "TN": "-"
+        },
+        "hat": {
+            "accuracy": 0.847,
+            "precision": "-",
+            "recall": "-",
+            "f1": "-",
+            "TP": "-",
+            "FP": "-",
+            "FN": "-",
+            "TN": "-"
+        },
+        "glasses": {
+            "accuracy": 0.91,
+            "precision": "-",
+            "recall": "-",
+            "f1": "-",
+            "TP": "-",
+            "FP": "-",
+            "FN": "-",
+            "TN": "-"
+        },
+        "backpack": {
+            "accuracy": 0.967,
+            "precision": "-",
+            "recall": "-",
+            "f1": "-",
+            "TP": "-",
+            "FP": "-",
+            "FN": "-",
+            "TN": "-"
+        }
+    }
+}

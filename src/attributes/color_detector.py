@@ -1,14 +1,12 @@
 """
-Đề xuất cải tiến cho src/attributes/color_detector.py
-======================================================
-Thay đổi chính so với bản gốc:
-1. Chuẩn hóa ánh sáng (gray-world) trên ROI trước khi chuyển sang HSV, giảm phụ
-   thuộc vào điều kiện đèn của từng camera/scene.
-2. Thay "trimmed median" bằng phân cụm nhẹ (K=2, dùng cv2.kmeans trên không gian
-   H-S sau khi loại các pixel quá tối/quá sáng) rồi chọn cụm chiếm số pixel lớn
-   nhất -> xử lý tốt hơn với áo có 2 tông màu / có bóng đổ, vẫn rất rẻ (ROI nhỏ).
-3. Trả kèm "confidence" (tỉ lệ pixel thuộc cụm thắng) để pipeline/matcher có thể
-   hạ trọng số khi màu không rõ ràng (áo họa tiết phức tạp).
+src/attributes/color_detector.py
+================================
+Module trích xuất và phân tích màu sắc của đối tượng (áo, quần) sử dụng thuật toán K-Means Clustering trên không gian màu HSV.
+
+TÍNH NĂNG CHÍNH:
+    - Cân bằng trắng (Gray-world normalization) giúp chống nhiễu màu dưới các điều kiện ánh sáng khác nhau.
+    - Phân cụm K-Means động để tìm màu chủ đạo, giải quyết được áo có họa tiết hoặc bóng râm.
+    - Lọc điểm ảnh có màu da người (Skin Filtering) để không bị nhận nhầm tay, cổ thành màu áo.
 """
 
 import cv2
@@ -55,10 +53,16 @@ class ColorDetector:
         if pixels.size == 0:
             pixels = roi_hsv.reshape(-1, 3).astype(np.float32)
 
-        # Loại bỏ pixel cực tối/cực sáng (thường là bóng/viền/phản sáng, không mang
-        # thông tin màu áo thật) trước khi phân cụm, giữ lại median làm fallback
+        # Loại bỏ pixel cực tối/cực sáng (thường là bóng/viền/phản sáng)
+        # P1-3: Skin Filtering - Lọc loại bỏ pixel màu da 
+        # (Trong OpenCV: H thuộc 0-179. Ngưỡng màu da thường rơi vào H: 0-12 hoặc 170-179, S: 30-150, V > 60)
+        h_channel = pixels[:, 0]
+        s_channel = pixels[:, 1]
         v_channel = pixels[:, 2]
-        mask = (v_channel > 15) & (v_channel < 250)
+        
+        is_skin = ((h_channel <= 12) | (h_channel >= 170)) & (s_channel >= 30) & (s_channel <= 150) & (v_channel > 60)
+        mask = (v_channel > 15) & (v_channel < 250) & (~is_skin)
+        
         filtered = pixels[mask] if mask.sum() >= 10 else pixels
 
         if len(filtered) < self.n_clusters:

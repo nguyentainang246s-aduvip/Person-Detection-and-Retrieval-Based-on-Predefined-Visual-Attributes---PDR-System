@@ -19,6 +19,7 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.retrieval.pipeline import PersonRetrievalPipeline
+from src.utils.config_loader import load_config
 from src.database.db import DatabaseManager
 from src.utils.video_utils import (
     open_video, read_frame, release_video,
@@ -39,33 +40,72 @@ st.set_page_config(
 # ── Custom CSS giao diện tiếng Việt hiện đại ──────────────────
 st.markdown("""
 <style>
+    /* Nhập font chữ Inter hiện đại */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Header chính */
     .main-header {
-        font-size: 2.1rem;
+        font-size: 2.5rem;
         font-weight: 700;
-        color: #1976D2;
+        background: linear-gradient(90deg, #1A2980 0%, #26D0CE 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         margin-bottom: 0.2rem;
+        letter-spacing: -0.5px;
     }
+    
+    /* Sub header */
     .sub-header {
-        font-size: 1.05rem;
-        color: #555555;
-        margin-bottom: 1.2rem;
+        font-size: 1.1rem;
+        font-weight: 400;
+        color: #64748b;
+        margin-bottom: 1.5rem;
     }
+    
+    /* Thẻ thông tin mục tiêu (Glassmorphism style) */
     .target-card {
-        background-color: #F1F8E9;
-        border-left: 5px solid #4CAF50;
-        padding: 12px;
-        border-radius: 6px;
-        margin-bottom: 10px;
-        color: #1B5E20;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        border-left: 5px solid #3b82f6;
+        padding: 16px;
+        border-radius: 12px;
+        margin-bottom: 15px;
+        color: #334155;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        transition: transform 0.2s ease;
+    }
+    .target-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
     .target-card b {
-        color: #2E7D32;
+        color: #0f172a;
+        font-weight: 600;
     }
+    
+    /* Box hiển thị Metric (FPS, Count) */
     .metric-box {
-        background: #F5F5F5;
-        padding: 10px;
-        border-radius: 8px;
+        background: #ffffff;
+        padding: 15px;
+        border-radius: 12px;
         text-align: center;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    .stButton > button:hover {
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -74,7 +114,9 @@ st.markdown("""
 @st.cache_resource
 def load_pipeline():
     """Cache pipeline để tải mô hình 1 lần duy nhất."""
-    return PersonRetrievalPipeline()
+    config = load_config()
+    thresh = config.get("matching", {}).get("default_threshold", 0.70)
+    return PersonRetrievalPipeline(matching_threshold=thresh)
 
 
 @st.cache_resource

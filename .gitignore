@@ -93,3 +93,7 @@ htmlcov/
 
 # --- Windows ---
 $RECYCLE.BIN/
+
+# SQLite WAL files
+*-wal
+*-shm
