@@ -32,7 +32,10 @@ datasets/
 
 # --- Results (output, crops) ---
 results/crops/
-results/logs/
+results/logs/*.log
+results/logs/*.txt
+# GIỮ retrieval_results.csv để chứng minh pipeline chạy được end-to-end
+!results/logs/retrieval_results.csv
 results/*.mp4
 results/*.avi
 

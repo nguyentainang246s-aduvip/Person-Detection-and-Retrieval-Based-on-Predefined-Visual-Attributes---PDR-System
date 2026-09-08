@@ -1,7 +1,8 @@
 Attribute,Accuracy,Precision,Recall,F1,TP,FP,FN,TN
-gender_female,85.20%,-,-,-,-,-,-,-
-hat,84.70%,-,-,-,-,-,-,-
-glasses,91.00%,-,-,-,-,-,-,-
-backpack,96.70%,-,-,-,-,-,-,-
+gender_female,85.20%,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K
+hat,84.70%,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K
+glasses,91.00%,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K
+backpack,96.70%,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K,Cần dataset PA-100K
 
 Mean Accuracy (mA),89.33%
+Nguồn số liệu,Số liệu Accuracy từ Colab training — CHƯA có Precision/Recall/F1 (cần dataset PA-100K local)

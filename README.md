@@ -47,7 +47,7 @@ ByteTrack MOT Tracking     → Gán Track ID ổn định qua các frame
         ↓
 Person Crop ROI Extraction → Trích xuất vùng ảnh từng người
         ↓  ┌────────────────────────────────────────┐
-        ↓  │  HSV K-Means + Skin Filtering (~0.1ms) │
+        ↓  │  K-Means (H-S của HSV) + Skin Filtering (~0.5ms) │
         ↓  │  ResNet50 PAR Classifier (~11ms on GPU)│
         ↓  │  Temporal EMA Smoothing (α=0.35)       │
         ↓  └────────────────────────────────────────┘
@@ -72,7 +72,7 @@ Streamlit Web UI + SQLite Database
 │   ├── detection/detector.py # Module phát hiện người (YOLOv8)
 │   ├── tracking/tracker.py   # Module theo dõi đối tượng (ByteTrack)
 │   ├── attributes/
-│   │   ├── color_detector.py # Phân tích màu áo / quần (HSV + Trimmed Median)
+│   │   ├── color_detector.py # Phân tích màu áo/quần (K-Means trên kênh H-S của HSV + Skin Filtering)
 │   │   └── par_model.py      # Nhận diện thuộc tính (ResNet50 PAR)
 │   ├── retrieval/
 │   │   ├── matcher.py        # Bộ so khớp thuộc tính có trọng số

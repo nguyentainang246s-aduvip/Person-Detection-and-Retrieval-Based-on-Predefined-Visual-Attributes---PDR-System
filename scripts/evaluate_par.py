@@ -269,7 +269,12 @@ def print_results_table(results: dict, source: str = "live"):
 
 
 def save_results_csv(results: dict, output_path: str):
-    """Lưu kết quả ra CSV."""
+    """
+    Lưu kết quả evaluation ra CSV.
+
+    Nếu kết quả từ Colab demo (không có Precision/Recall/F1/TP/FP/FN/TN),
+    ghi chú rõ ràng thay vì để dấu '-' im lặng.
+    """
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with open(output_path, "w", newline="", encoding="utf-8") as f:
@@ -278,25 +283,34 @@ def save_results_csv(results: dict, output_path: str):
 
         for attr, data in results.get("per_class", {}).items():
             def fmt_pct(val):
-                if isinstance(val, (int, float)):
+                """Định dạng phần trăm nếu là số, giữ nguyên nếu là chuỗi ghi chú."""
+                if isinstance(val, float):
                     return f"{val*100:.2f}%"
+                if isinstance(val, int) and not isinstance(val, bool):
+                    return f"{val*100:.2f}%"
+                # Là chuỗi ghi chú — giữ nguyên để người đọc hiểu rõ
                 return str(val)
 
             writer.writerow([
                 attr,
                 fmt_pct(data.get("accuracy", 0)),
-                fmt_pct(data.get("precision", "-")),
-                fmt_pct(data.get("recall", "-")),
-                fmt_pct(data.get("f1", "-")),
-                data.get("TP", "-"),
-                data.get("FP", "-"),
-                data.get("FN", "-"),
-                data.get("TN", "-"),
+                fmt_pct(data.get("precision", "Cần dataset PA-100K")),
+                fmt_pct(data.get("recall",    "Cần dataset PA-100K")),
+                fmt_pct(data.get("f1",        "Cần dataset PA-100K")),
+                data.get("TP", "Cần dataset PA-100K"),
+                data.get("FP", "Cần dataset PA-100K"),
+                data.get("FN", "Cần dataset PA-100K"),
+                data.get("TN", "Cần dataset PA-100K"),
             ])
 
         writer.writerow([])
         mA = results.get("mA") or results.get("overall", {}).get("val_mA", 0)
         writer.writerow(["Mean Accuracy (mA)", f"{mA*100:.2f}%"])
+        # Ghi rõ nguồn gốc để tránh nhầm lẫn khi đọc CSV
+        is_real = results.get("source", "colab") != "colab"
+        writer.writerow(["Nguồn số liệu",
+                         "Đo thật trên PA-100K test set" if is_real
+                         else "Số liệu Accuracy từ Colab training — CHƯA có Precision/Recall/F1 (cần dataset PA-100K local)"])
 
     logger.info(f"Đã lưu kết quả evaluation ra: {output_path}")
 
@@ -348,14 +362,17 @@ def main():
 
         print_results_table(COLAB_RESULTS, source="colab")
 
-        # Lưu Colab results ra CSV
+        # Lưu Colab results ra CSV.
+        # Precision/Recall/F1/TP/FP/FN/TN được để trống vì không có dataset local;
+        # save_results_csv() sẽ ghi chú rõ "Cần dataset PA-100K" thay vì "-" im lặng.
         colab_csv = {
             "mA": COLAB_RESULTS["overall"]["val_mA"],
+            "source": "colab",  # Đánh dấu nguồn để save_results_csv xử lý đúng
             "per_class": {
                 attr: {
-                    "accuracy": data["accuracy"],
-                    "precision": "-", "recall": "-", "f1": "-",
-                    "TP": "-", "FP": "-", "FN": "-", "TN": "-"
+                    "accuracy": data["accuracy"]
+                    # Không có precision/recall/f1/TP/FP/FN/TN → để missing key
+                    # → save_results_csv sẽ dùng default "Cần dataset PA-100K"
                 }
                 for attr, data in COLAB_RESULTS["per_class"].items()
             }
