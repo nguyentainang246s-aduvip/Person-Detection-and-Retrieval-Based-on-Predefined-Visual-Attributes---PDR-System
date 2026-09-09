@@ -51,7 +51,7 @@ evaluation:
 
 # --- Module Color Detection ---
 color:
-  method: "kmeans_hsv_delta_e" # K-Means phân cụm HSV kết hợp loại trừ da và CIE Lab Delta-E
+  method: "kmeans_hsv"          # K-Means phân cụm trên kênh H-S của HSV + lọc da (Skin Filtering) + fallback Delta-E CIE Lab khi HSV trả "Other"
   # Phần trăm crop dùng để detect màu upper (50% trên = phần áo)
   upper_ratio: 0.5
   # Phần trăm crop dùng để detect màu lower (40% dưới = phần quần)
@@ -64,7 +64,7 @@ color:
 
 # --- Module Matching ---
 matching:
-  default_threshold: 0.50      # Ngưỡng điểm matching mặc định (50% attributes phải khớp)
+  default_threshold: 0.70      # Ngưỡng điểm matching mặc định (70% attributes phải khớp)
 
 # --- Video Processing ---
 video:

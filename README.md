@@ -28,7 +28,7 @@ Hệ thống kết hợp mô hình thị giác máy tính và học sâu (YOLOv8
 
 - 🎯 **Phát hiện người (Person Detection):** Sử dụng YOLOv8n để phát hiện người trong từng khung hình.
 - 🔄 **Theo dõi đối tượng (Tracking):** ByteTrack duy trì Track ID ổn định qua các khung hình, giảm thiểu mất dấu khi bị che khuất tạm thời.
-- 👔 **Phân tích màu sắc (Color Recognition):** Trích xuất màu áo và màu quần trong không gian màu HSV bằng thuật toán phân cụm K-Means, kết hợp lọc loại trừ pixel màu da bằng ngưỡng HSV để chống nhận diện nhầm.
+- 👔 **Phân tích màu sắc (Color Recognition):** Trích xuất màu áo và màu quần bằng thuật toán phân cụm K-Means trên kênh H-S của không gian HSV, kết hợp lọc loại trừ pixel màu da (Skin Filtering). Khi HSV không đủ phân biệt, hệ thống sử dụng fallback Delta-E trong không gian CIE Lab để nhận diện chính xác hơn. So khớp màu dùng bảng lân cận (Soft Color Matching) cho phép dung sai giữa các màu gần nhau.
 - 🧠 **Nhận diện thuộc tính (Attribute Recognition):** ResNet50 nhận dạng giới tính, mũ, kính, balo.
 - ⏱️ **Làm mịn nhãn theo thời gian (Temporal EMA Smoothing):** Giảm rung giật nhãn phân loại qua chuỗi các khung hình liên tiếp.
 - 🎛️ **Bộ máy so khớp linh hoạt (Weighted Matching Engine):** Chấm điểm độ tương đồng (%) theo trọng số, hỗ trợ tìm kiếm linh hoạt với các thuộc tính tùy chọn (`Any`).
