@@ -31,6 +31,7 @@ import os
 import sys
 import csv
 import time
+import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.models as models

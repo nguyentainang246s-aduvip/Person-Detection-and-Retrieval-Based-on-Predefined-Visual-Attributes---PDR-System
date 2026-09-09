@@ -35,12 +35,15 @@ import cv2
 import numpy as np
 from pathlib import Path
 
-from src.detection.detector import PersonDetector
+# PersonDetector: dùng cho standalone scripts (benchmark_fps.py, test_detection.py)
+# Không sử dụng trực tiếp trong pipeline production — detect+track đều qua PersonTracker.track()
+from src.detection.detector import PersonDetector  # noqa: F401
 from src.tracking.tracker import PersonTracker
 from src.attributes.color_detector import ColorDetector
 from src.attributes.par_model import AttributeRecognizer
 from src.retrieval.matcher import AttributeMatcher
 from src.database.db import DatabaseManager
+from src.utils.config_loader import load_config
 from src.utils.video_utils import (
     open_video, read_frame, release_video,
     get_video_writer, frame_to_timestamp,
@@ -61,6 +64,16 @@ TRACK_MEMORY_MAX_SIZE = 500        # chặn trên tuyệt đối, phòng trườ
 class PersonRetrievalPipeline:
     """
     Bộ điều phối toàn diện cho hệ thống phát hiện và tìm người theo đặc điểm nhận dạng.
+
+    GHI CHÚ KIẾN TRÚC (QUAN TRỌNG):
+        - Single-session: Mỗi instance giữ state riêng (tracker, track_memory, ghost_tracks).
+          Nếu dùng @st.cache_resource trong Streamlit, MỌI user session sẽ share cùng 1 instance
+          → dữ liệu tìm kiếm bị lẫn giữa các user. Với triển khai đa người dùng, cần tạo
+          pipeline theo st.session_state thay vì cache_resource toàn cục.
+        - Ghost track inheritance hiện chỉ dùng so khớp thuộc tính cơ bản (gender + upper_color),
+          CHƯA có Re-ID embedding (appearance vector). Trong tình huống nhiều người occlusion
+          đồng thời, vẫn có rủi ro gán nhầm thuộc tính — hướng khắc phục triệt để cần
+          tích hợp Re-ID backbone (OSNet/BoT-SORT) để so khớp bằng cosine similarity.
     """
 
     def __init__(
@@ -73,6 +86,11 @@ class PersonRetrievalPipeline:
         attribute_update_interval: int = 5 # Tối ưu hóa: Phân tích lại thuộc tính mỗi 5 frames cho mỗi ID
     ):
         logger.info("Đang khởi tạo toàn bộ các module trong Pipeline...")
+
+        # Đọc cấu hình từ config.yaml
+        self._config = load_config()
+        video_cfg = self._config.get("video", {})
+        self.skip_n_frames = video_cfg.get("process_every_n_frames", 1)
 
         self.device = device
         self.matching_threshold = matching_threshold
@@ -105,7 +123,7 @@ class PersonRetrievalPipeline:
         # Ghost tracks: lưu các track vừa bị evict gần đây để hỗ trợ kế thừa khi bị ID-switch
         self.ghost_tracks = {}
 
-        logger.info("Pipeline đã sẵn sàng hoạt động!")
+        logger.info(f"Pipeline đã sẵn sàng hoạt động! (skip_n_frames={self.skip_n_frames})")
 
     def reset(self):
         """Reset trạng thái bộ nhớ cho lượt tìm kiếm mới."""
@@ -113,22 +131,56 @@ class PersonRetrievalPipeline:
         self.track_memory.clear()
         self.ghost_tracks.clear()
 
-    def _try_inherit_ghost(self, new_track_id: int, frame_idx: int) -> bool:
-        """Track mới xuất hiện → thử kế thừa smooth_probs từ ghost gần nhất (< 60 frames ~ 2s)."""
+    def _try_inherit_ghost(self, new_track_id: int, frame_idx: int,
+                           new_attrs: dict = None) -> bool:
+        """
+        Track mới xuất hiện → thử kế thừa smooth_probs từ ghost phù hợp nhất (< 60 frames ~ 2s).
+
+        GIỚI HẠN: So khớp dựa trên thuộc tính cơ bản (gender + upper_color), KHÔNG dùng
+        Re-ID embedding (appearance vector). Trong tình huống nhiều người có thuộc tính giống
+        nhau bị occlusion đồng thời, vẫn có thể kế thừa nhầm. Hướng khắc phục triệt để:
+        tích hợp Re-ID backbone (OSNet) để so khớp bằng cosine similarity.
+        """
         if not self.ghost_tracks:
             return False
-        best_id = max(self.ghost_tracks, key=lambda tid: self.ghost_tracks[tid]["last_updated"])
+
+        # Lọc ghost còn trong cửa sổ thời gian (< 60 frames ~ 2 giây)
+        valid_ghosts = {
+            tid: g for tid, g in self.ghost_tracks.items()
+            if frame_idx - g["last_updated"] <= 60
+        }
+        if not valid_ghosts:
+            return False
+
+        # Nếu có thuộc tính mới (từ frame hiện tại), ưu tiên ghost khớp gender + upper_color
+        if new_attrs:
+            scored = []
+            for tid, g in valid_ghosts.items():
+                g_attrs = g.get("attributes", {})
+                similarity = 0
+                # So khớp gender
+                if g_attrs.get("gender") == new_attrs.get("gender"):
+                    similarity += 2  # trọng số cao vì gender ít thay đổi
+                # So khớp upper_color
+                if g_attrs.get("upper_color") == new_attrs.get("upper_color"):
+                    similarity += 1
+                scored.append((similarity, g["last_updated"], tid))
+            # Ưu tiên: khớp thuộc tính nhiều nhất → gần nhất về thời gian
+            scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+            best_id = scored[0][2]
+        else:
+            # Fallback: chọn ghost gần nhất (hành vi cũ, khi chưa có attrs)
+            best_id = max(valid_ghosts, key=lambda tid: valid_ghosts[tid]["last_updated"])
+
         ghost = self.ghost_tracks[best_id]
-        if frame_idx - ghost["last_updated"] <= 60:
-            self.track_memory[new_track_id] = {
-                **ghost,
-                "last_updated": frame_idx,
-                "inherited_from": best_id,
-                "crop": None,
-            }
-            self.ghost_tracks.pop(best_id, None)
-            return True
-        return False
+        self.track_memory[new_track_id] = {
+            **ghost,
+            "last_updated": frame_idx,
+            "inherited_from": best_id,
+            "crop": None,
+        }
+        self.ghost_tracks.pop(best_id, None)
+        return True
 
     def _evict_stale_tracks(self, frame_idx: int):
         """Xóa các track_id không được cập nhật; chuyển vào ghost_tracks để hỗ trợ kế thừa."""
@@ -335,83 +387,96 @@ class PersonRetrievalPipeline:
         frame_idx = 0
         all_unique_targets_found = {} # track_id -> best result dict
 
-        while True:
-            if max_frames and frame_idx >= max_frames:
-                break
-
-            fps_counter.start_frame()
-            success, frame = read_frame(cap)
-            if not success:
-                break
-
-            # Xử lý frame qua pipeline
-            annotated_frame, targets = self.process_frame(
-                frame, frame_idx, target_query, threshold=thresh
-            )
-
-            # Vẽ Query panel và FPS đếm
-            annotated_frame = draw_query_panel(annotated_frame, target_query, thresh)
-            annotated_frame = draw_fps_and_count(
-                annotated_frame,
-                fps=fps_counter.get_fps(),
-                total_detected=len(self.track_memory),
-                total_matched=len(all_unique_targets_found)
-            )
-
-            # Ghi nhận các target tìm thấy
-            timestamp = frame_to_timestamp(frame_idx, fps)
-            for t in targets:
-                tid = t["track_id"]
-                if tid not in all_unique_targets_found or t["score"] > all_unique_targets_found[tid]["score"]:
-                    # Lưu ảnh crop người tìm thấy
-                    crop_filename = f"target_track_{tid:03d}_{timestamp.replace(':', '-')}.jpg"
-                    crop_full_path = os.path.join(save_crops_dir, crop_filename)
-                    if t["crop"] is not None and t["crop"].size > 0:
-                        cv2.imwrite(crop_full_path, t["crop"])
-                        # Giải phóng ngay crop khỏi RAM
-                        if tid in self.track_memory:
-                            self.track_memory[tid]["crop"] = None
-
-                    all_unique_targets_found[tid] = {
-                        "track_id": tid,
-                        "score": t["score"],
-                        "timestamp": timestamp,
-                        "frame_idx": frame_idx,
-                        "attributes": t["attributes"],
-                        "crop_path": crop_full_path
-                    }
-
-                    # Lưu vào SQLite Database
-                    self.db.save_target_result(query_id, all_unique_targets_found[tid])
-
-                    if save_csv_log:
-                        attr = t["attributes"]
-                        csv_writer.writerow([
-                            timestamp, frame_idx, tid, f"{t['score']*100:.1f}%",
-                            attr.get("gender"), attr.get("upper_color"), attr.get("lower_color"),
-                            attr.get("hat"), attr.get("glasses"), attr.get("backpack"), crop_full_path
-                        ])
-                        csv_file.flush()
-
-            if writer:
-                writer.write(annotated_frame)
-
-            if display:
-                disp = resize_frame(annotated_frame, width=1280)
-                cv2.imshow("Person Retrieval Demo", disp)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+        try:
+            while True:
+                if max_frames and frame_idx >= max_frames:
                     break
 
-            fps_counter.end_frame()
-            frame_idx += 1
+                fps_counter.start_frame()
+                success, frame = read_frame(cap)
+                if not success:
+                    break
 
-        release_video(cap)
-        if writer:
-            writer.release()
-        if save_csv_log:
-            csv_file.close()
-        if display:
-            cv2.destroyAllWindows()
+                # Frame skipping theo config (process_every_n_frames)
+                if self.skip_n_frames > 1 and frame_idx % self.skip_n_frames != 0:
+                    frame_idx += 1
+                    fps_counter.end_frame()
+                    continue
+
+                # Xử lý frame qua pipeline
+                annotated_frame, targets = self.process_frame(
+                    frame, frame_idx, target_query, threshold=thresh
+                )
+
+                # Vẽ Query panel và FPS đếm
+                annotated_frame = draw_query_panel(annotated_frame, target_query, thresh)
+                annotated_frame = draw_fps_and_count(
+                    annotated_frame,
+                    fps=fps_counter.get_fps(),
+                    total_detected=len(self.track_memory),
+                    total_matched=len(all_unique_targets_found)
+                )
+
+                # Ghi nhận các target tìm thấy
+                timestamp = frame_to_timestamp(frame_idx, fps)
+                for t in targets:
+                    tid = t["track_id"]
+                    if tid not in all_unique_targets_found or t["score"] > all_unique_targets_found[tid]["score"]:
+                        # Lưu ảnh crop người tìm thấy
+                        crop_filename = f"target_track_{tid:03d}_{timestamp.replace(':', '-')}.jpg"
+                        crop_full_path = os.path.join(save_crops_dir, crop_filename)
+                        if t["crop"] is not None and t["crop"].size > 0:
+                            cv2.imwrite(crop_full_path, t["crop"])
+                            # Giải phóng ngay crop khỏi RAM
+                            if tid in self.track_memory:
+                                self.track_memory[tid]["crop"] = None
+
+                        all_unique_targets_found[tid] = {
+                            "track_id": tid,
+                            "score": t["score"],
+                            "timestamp": timestamp,
+                            "frame_idx": frame_idx,
+                            "attributes": t["attributes"],
+                            "crop_path": crop_full_path
+                        }
+
+                        # Lưu vào SQLite Database
+                        self.db.save_target_result(query_id, all_unique_targets_found[tid])
+
+                        if save_csv_log:
+                            attr = t["attributes"]
+                            csv_writer.writerow([
+                                timestamp, frame_idx, tid, f"{t['score']*100:.1f}%",
+                                attr.get("gender"), attr.get("upper_color"), attr.get("lower_color"),
+                                attr.get("hat"), attr.get("glasses"), attr.get("backpack"), crop_full_path
+                            ])
+                            csv_file.flush()
+
+                if writer:
+                    writer.write(annotated_frame)
+
+                if display:
+                    disp = resize_frame(annotated_frame, width=1280)
+                    cv2.imshow("Person Retrieval Demo", disp)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+
+                fps_counter.end_frame()
+                frame_idx += 1
+
+        finally:
+            # Đảm bảo giải phóng TẤT CẢ tài nguyên dù có exception hay không
+            release_video(cap)
+            if writer:
+                writer.release()
+            if save_csv_log:
+                try:
+                    csv_file.close()
+                except Exception:
+                    pass
+            if display:
+                cv2.destroyAllWindows()
+            logger.info(f"Đã giải phóng tài nguyên video. Frames đã xử lý: {frame_idx}")
 
         logger.info(f"Hoàn thành xử lý {frame_idx} frames. Tổng số đối tượng Target tìm thấy: {len(all_unique_targets_found)}")
 
