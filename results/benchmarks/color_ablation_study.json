@@ -1,0 +1,20 @@
+{
+  "HSV K-Means (Thuần)": {
+    "normal": 51.8,
+    "backlight": 25.4,
+    "pattern": 47.0,
+    "latency_ms": 0.9035499999930229
+  },
+  "HSV + Delta-E Fallback": {
+    "normal": 51.8,
+    "backlight": 24.400000000000002,
+    "pattern": 47.0,
+    "latency_ms": 0.754606399994979
+  },
+  "Learned Color Head (Deep Learning)": {
+    "normal": 44.2,
+    "backlight": 38.6,
+    "pattern": 39.2,
+    "latency_ms": 12.12709600000077
+  }
+}

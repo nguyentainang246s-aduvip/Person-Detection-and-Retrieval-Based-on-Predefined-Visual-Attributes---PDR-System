@@ -1,0 +1,49 @@
+{
+  "module_benchmarks": [
+    {
+      "model": "YOLOv8n Detection",
+      "eager_ms": 75.12,
+      "onnx_fp32_ms": 49.5,
+      "onnx_int8_ms": "-",
+      "size_mb": 6.2,
+      "speedup": "1.5x"
+    },
+    {
+      "model": "PAR (MobileNetV3)",
+      "eager_ms": 18.34,
+      "onnx_fp32_ms": 3.16,
+      "onnx_int8_ms": 2.74,
+      "size_mb": 11.82,
+      "speedup": "6.7x"
+    },
+    {
+      "model": "DualColorNet (Color)",
+      "eager_ms": 10.54,
+      "onnx_fp32_ms": 1.45,
+      "onnx_int8_ms": 1.58,
+      "size_mb": 3.72,
+      "speedup": "6.7x"
+    }
+  ],
+  "pipeline_benchmarks": [
+    {
+      "pipeline": "Baseline (ResNet-50 + PyTorch Eager)",
+      "fps": 4.78,
+      "latency_frame": 209.02,
+      "note": "Hệ thống ban đầu"
+    },
+    {
+      "pipeline": "Giai đoạn 3 (MobileNetV3 + PyTorch Eager)",
+      "fps": 6.54,
+      "latency_frame": 153.02,
+      "note": "Thay thế backbone nhẹ"
+    },
+    {
+      "pipeline": "Giai đoạn 4 (ONNX Runtime + INT8 Quantized)",
+      "fps": 6.95,
+      "latency_frame": 143.84,
+      "note": "Tối ưu hóa phần cứng toàn diện"
+    }
+  ],
+  "cosine_similarity": 0.9982706904411316
+}

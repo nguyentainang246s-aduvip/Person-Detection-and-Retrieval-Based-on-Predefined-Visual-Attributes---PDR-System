@@ -17,7 +17,7 @@ paths:
 # --- Module Detection (YOLO) ---
 detection:
   model: "yolov8n.pt"          # Model nhỏ nhất, đủ nhanh cho demo
-  confidence: 0.4              # Ngưỡng confidence tối thiểu
+  confidence: 0.45             # Ngưỡng confidence tối thiểu (cân bằng tối ưu)
   iou: 0.5                     # IoU threshold cho NMS
   classes: [0]                 # Class 0 = person trong COCO
   imgsz: 640                   # Kích thước ảnh input YOLO
@@ -51,7 +51,7 @@ evaluation:
 
 # --- Module Color Detection ---
 color:
-  method: "kmeans_hsv"          # K-Means phân cụm trên kênh H-S của HSV + lọc da (Skin Filtering) + fallback Delta-E CIE Lab khi HSV trả "Other"
+  method: "kmeans_hsv"          # Hỗ trợ: "kmeans_hsv", "hsv_delta_e", "learned_head" (Deep Learning Color Head - GĐ 2)
   # Phần trăm crop dùng để detect màu upper (50% trên = phần áo)
   upper_ratio: 0.5
   # Phần trăm crop dùng để detect màu lower (40% dưới = phần quần)
@@ -65,6 +65,26 @@ color:
 # --- Module Matching ---
 matching:
   default_threshold: 0.70      # Ngưỡng điểm matching mặc định (70% attributes phải khớp)
+
+# --- Pipeline Processing ---
+pipeline:
+  max_cnn_per_frame: 2          # Giới hạn số forward pass PAR mỗi frame
+  ema_alpha: 0.35               # Hệ số EMA mặc định cho smoothing xác suất thuộc tính
+  eviction_interval: 50         # Dọn dẹp track_memory mỗi N frames
+  ghost_window_frames: 150      # Cửa sổ thời gian ghost track (frames) - 5 giây
+  ghost_max_size: 50            # Số ghost tracks tối đa giữ lại
+  track_ttl_frames: 300         # Track không cập nhật sau N frames sẽ bị evict
+  track_max_size: 500           # Số track tối đa trong bộ nhớ
+
+# --- Re-ID Configuration ---
+reid:
+  enabled: true
+  cosine_threshold: 0.50        # Ngưỡng cosine similarity cho ghost matching
+  total_score_threshold: 0.55   # Ngưỡng tổng điểm kết hợp
+  ema_alpha: 0.70               # Hệ số EMA cho cập nhật embedding
+  reid_weight: 0.70             # Trọng số Re-ID trong tổng điểm
+  attr_weight: 0.30             # Trọng số thuộc tính trong tổng điểm
+  ghost_window_frames: 150      # Cửa sổ thời gian ghost matching
 
 # --- Video Processing ---
 video:

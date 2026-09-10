@@ -70,15 +70,41 @@ def draw_bounding_box(frame, bbox, track_id, color=COLOR_NOT_MATCH, thickness=2)
     return frame
 
 
-def draw_person_info(frame, bbox, info_dict, matched=False):
+def draw_person_info(
+    frame,
+    bbox,
+    info_dict: dict = None,
+    matched: bool = False,
+    track_id: int = None,
+    attributes: dict = None,
+    score: float = None,
+    is_matched: bool = None,
+    **kwargs
+):
     """
     Vẽ thông tin thuộc tính bằng tiếng Việt của người bên cạnh bounding box.
+    Hỗ trợ cả định dạng info_dict hoặc tham số tường minh (track_id, attributes, score, is_matched).
     """
     x1, y1, x2, y2 = [int(v) for v in bbox]
+
+    if is_matched is not None:
+        matched = is_matched
+
+    # Gom thông tin nếu truyền dạng tường minh
+    data = {}
+    if info_dict is not None and isinstance(info_dict, dict):
+        data.update(info_dict)
+    if attributes is not None and isinstance(attributes, dict):
+        data.update(attributes)
+    if track_id is not None:
+        data["track_id"] = track_id
+    if score is not None:
+        data["score"] = score
+
     color = COLOR_MATCHED if matched else COLOR_NOT_MATCH
 
     # Vẽ bbox
-    draw_bounding_box(frame, bbox, info_dict.get("track_id", "?"), color)
+    draw_bounding_box(frame, bbox, data.get("track_id", "?"), color)
 
     if not matched:
         return frame
@@ -86,24 +112,24 @@ def draw_person_info(frame, bbox, info_dict, matched=False):
     # ── Xây dựng danh sách text tiếng Việt hiển thị ──
     lines = []
 
-    gender_raw = str(info_dict.get("gender", "?"))
+    gender_raw = str(data.get("gender", "?"))
     gender_vi = "Nu" if gender_raw.lower() in ["female", "nu", "nữ"] else "Nam"
     lines.append(f"Gioi tinh: {gender_vi}")
 
-    upper = translate_color(info_dict.get("upper_color", ""))
+    upper = translate_color(data.get("upper_color", ""))
     lines.append(f"Ao : {upper}")
 
-    lower = translate_color(info_dict.get("lower_color", ""))
+    lower = translate_color(data.get("lower_color", ""))
     lines.append(f"Quan: {lower}")
 
     accessories = []
-    if info_dict.get("hat"):      accessories.append("Mu")
-    if info_dict.get("glasses"):  accessories.append("Kinh")
-    if info_dict.get("backpack"): accessories.append("Balo")
+    if data.get("hat"):      accessories.append("Mu")
+    if data.get("glasses"):  accessories.append("Kinh")
+    if data.get("backpack"): accessories.append("Balo")
     if accessories:
         lines.append(f"Kem: {', '.join(accessories)}")
 
-    score = info_dict.get("score")
+    score = data.get("score")
     if score is not None:
         lines.append(f"Do khop: {score*100:.0f}%")
 

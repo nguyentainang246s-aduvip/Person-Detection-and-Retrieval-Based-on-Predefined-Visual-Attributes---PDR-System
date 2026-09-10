@@ -1,0 +1,314 @@
+{
+  "25": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "66": {
+    "gender": "Male",
+    "upper_color": "Blue",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": true,
+    "backpack": false
+  },
+  "70": {
+    "gender": "Female",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "71": {
+    "gender": "Female",
+    "upper_color": "Green",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": true,
+    "backpack": false
+  },
+  "72": {
+    "gender": "Female",
+    "upper_color": "Black",
+    "lower_color": "Other",
+    "hat": true,
+    "glasses": false,
+    "backpack": false
+  },
+  "74": {
+    "gender": "Female",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "87": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "White",
+    "hat": false,
+    "glasses": true,
+    "backpack": true
+  },
+  "89": {
+    "gender": "Female",
+    "upper_color": "Red",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "90": {
+    "gender": "Female",
+    "upper_color": "White",
+    "lower_color": "White",
+    "hat": false,
+    "glasses": false,
+    "backpack": true
+  },
+  "92": {
+    "gender": "Female",
+    "upper_color": "Red",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "94": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "95": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Blue",
+    "hat": false,
+    "glasses": true,
+    "backpack": false
+  },
+  "96": {
+    "gender": "Male",
+    "upper_color": "Other",
+    "lower_color": "Gray",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "97": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "98": {
+    "gender": "Female",
+    "upper_color": "Green",
+    "lower_color": "Other",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "99": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": true,
+    "glasses": false,
+    "backpack": false
+  },
+  "100": {
+    "gender": "Male",
+    "upper_color": "White",
+    "lower_color": "Black",
+    "hat": true,
+    "glasses": false,
+    "backpack": false
+  },
+  "103": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": true,
+    "backpack": false
+  },
+  "104": {
+    "gender": "Female",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "107": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "White",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "109": {
+    "gender": "Female",
+    "upper_color": "White",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": true,
+    "backpack": false
+  },
+  "111": {
+    "gender": "Female",
+    "upper_color": "White",
+    "lower_color": "Gray",
+    "hat": false,
+    "glasses": false,
+    "backpack": true
+  },
+  "113": {
+    "gender": "Female",
+    "upper_color": "Red",
+    "lower_color": "Gray",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "115": {
+    "gender": "Female",
+    "upper_color": "Black",
+    "lower_color": "Other",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "116": {
+    "gender": "Female",
+    "upper_color": "Green",
+    "lower_color": "Blue",
+    "hat": false,
+    "glasses": true,
+    "backpack": false
+  },
+  "118": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": true,
+    "glasses": false,
+    "backpack": false
+  },
+  "119": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "122": {
+    "gender": "Male",
+    "upper_color": "Gray",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "123": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "124": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Gray",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "125": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Gray",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "126": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": true,
+    "glasses": false,
+    "backpack": false
+  },
+  "127": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "129": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Gray",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "131": {
+    "gender": "Female",
+    "upper_color": "Black",
+    "lower_color": "Other",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "133": {
+    "gender": "Female",
+    "upper_color": "Black",
+    "lower_color": "Blue",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "134": {
+    "gender": "Female",
+    "upper_color": "Black",
+    "lower_color": "Black",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "136": {
+    "gender": "Male",
+    "upper_color": "Black",
+    "lower_color": "Gray",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  },
+  "138": {
+    "gender": "Male",
+    "upper_color": "Gray",
+    "lower_color": "Gray",
+    "hat": false,
+    "glasses": false,
+    "backpack": false
+  }
+}

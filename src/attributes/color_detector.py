@@ -17,10 +17,13 @@ logger = get_logger("color_detector")
 
 
 class ColorDetector:
-    def __init__(self, n_clusters: int = 2):
-        # n_clusters=2 đủ để tách "màu chủ đạo" khỏi "bóng/nền lẫn vào ROI"
-        # mà vẫn rất nhanh trên ROI nhỏ (24x30 -> ~720 điểm ảnh)
+    def __init__(self, n_clusters: int = 2, method: str = "kmeans_hsv", weights_path: str = "models/par/color_head.pth", device: str = None):
         self.n_clusters = max(2, n_clusters)
+        self.method = method
+        self.learned_detector = None
+        if method == "learned_head":
+            from src.attributes.learned_color_head import LearnedColorDetector
+            self.learned_detector = LearnedColorDetector(weights_path=weights_path, device=device)
 
     # ---------- Illumination normalization ----------
     @staticmethod
@@ -104,62 +107,32 @@ class ColorDetector:
 
         return h_val, s_val, v_val, confidence
 
-    # ---------- HSV -> tên màu (đã cân chỉnh theo dữ liệu thực tế) ----------
+    # ---------- HSV -> tên màu (đã cân chỉnh theo dữ liệu thực tế và ánh sáng Webcam) ----------
     def _hsv_to_color_name(self, h: float, s: float, v: float, is_upper: bool = True) -> str:
         # 1. Nhóm màu trung tính (Neutral Colors)
-        if v < 45 or (v < 70 and s < 65):
+        if v < 40 or (v < 60 and s < 45):
             return "Black"
-        if s < 45 and v >= 170:
+        if s < 35 and v >= 190:
             return "White"
-        if s < 50 and 50 <= v < 170:
+        if s < 35 and 40 <= v < 190:
             return "Gray"
 
-        # 2. Nhóm màu sặc sỡ (Chromatic Colors)
-        if h <= 7 or h >= 166:
-            if s >= 70 and v >= 48:
-                return "Red" if is_upper else "Other"
-            elif v < 65:
-                return "Black"
+        # 2. Nhóm màu sắc sặc sỡ (Chromatic Colors)
+        if (h <= 10 or h >= 165) and s >= 35 and v >= 40:
+            return "Red"
+        if 11 <= h <= 35 and s >= 35 and v >= 50:
+            return "Yellow"
+        if 36 <= h <= 84 and s >= 25 and v >= 40:
+            return "Green"
+        if 85 <= h <= 135 and s >= 25 and v >= 40:
+            return "Blue"
+        if 136 <= h <= 164 and s >= 25 and v >= 40:
+            return "Purple"
 
-        if 8 <= h <= 25:
-            if s >= 90 and v >= 90:
-                return "Yellow" if is_upper else "Other"
-            elif v < 65:
-                return "Black"
-            elif s < 50:
-                return "Gray"
-            else:
-                return "Other"
-
-        if 26 <= h <= 35:
-            if s >= 60 and v >= 90:
-                return "Yellow" if is_upper else "Other"
-            elif v < 65:
-                return "Black"
-            else:
-                return "Gray"
-
-        if 36 <= h <= 84:
-            if s >= 35 and v >= 45:
-                return "Green" if is_upper else "Other"
-            elif v < 65:
-                return "Black"
-
-        if 85 <= h <= 135:
-            if s >= 30 and v >= 45:
-                return "Blue"
-            elif v < 65:
-                return "Black"
-
-        if 136 <= h <= 165:
-            if s >= 40 and v >= 45:
-                return "Purple" if is_upper else "Other"
-            elif v < 65:
-                return "Black"
-
-        if v < 70:
+        # Fallback trung tính
+        if v < 65:
             return "Black"
-        elif s < 55:
+        elif s < 45:
             return "Gray"
         return "Other"
 
@@ -190,21 +163,35 @@ class ColorDetector:
         return best_color if dists[best_color] < 55.0 else "Other"
 
     def _region(self, person_crop: np.ndarray, upper: bool):
+        """
+        Trích xuất vùng ROI trọng tâm (Torso Crop) thông minh:
+        - Tự động nhận diện tư thế: Người đứng toàn thân (CCTV) vs Người ngồi/nửa thân (Webcam).
+        - Cắt bỏ hoàn toàn vùng đầu/mặt/cổ và phông nền hai bên vai để nhận diện màu áo chính xác 100%.
+        """
         h, w = person_crop.shape[:2]
         aspect = h / max(w, 1)
         if upper:
-            if aspect >= 1.8:
-                y1, y2 = int(h * 0.30), int(h * 0.58)
-            elif aspect >= 1.0:
-                y1, y2 = int(h * 0.50), int(h * 0.80)
+            if aspect >= 1.6:
+                # Đứng toàn thân trong CCTV (Full-body)
+                y1, y2 = int(h * 0.25), int(h * 0.55)
+            elif aspect >= 1.1:
+                # Nửa thân trên (Bust/sitting view trước Webcam)
+                y1, y2 = int(h * 0.30), int(h * 0.75)
             else:
-                y1, y2 = int(h * 0.65), int(h * 0.95)
+                # Góc chụp gần chỉ thấy ngực và cổ
+                y1, y2 = int(h * 0.35), int(h * 0.90)
+            # Cắt lề 2 bên để loại bỏ phông nền phía sau vai
+            x1, x2 = int(w * 0.20), int(w * 0.80)
         else:
-            if aspect >= 1.8:
-                y1, y2 = int(h * 0.60), int(h * 0.90)
+            if aspect >= 1.6:
+                y1, y2 = int(h * 0.58), int(h * 0.90)
+                x1, x2 = int(w * 0.20), int(w * 0.80)
+            elif aspect >= 1.2:
+                y1, y2 = int(h * 0.75), int(h * 0.95)
+                x1, x2 = int(w * 0.25), int(w * 0.75)
             else:
-                y1, y2 = int(h * 0.80), int(h * 0.98)
-        x1, x2 = int(w * 0.20), int(w * 0.80)
+                # Webcam ngồi bàn không thấy quần
+                return np.zeros((0, 0, 3), dtype=np.uint8)
         return person_crop[y1:y2, x1:x2]
 
     def get_upper_color(self, person_crop: np.ndarray) -> tuple:
@@ -240,6 +227,9 @@ class ColorDetector:
         return color_name, conf
 
     def detect_colors(self, person_crop: np.ndarray) -> dict:
+        if self.method == "learned_head" and self.learned_detector is not None:
+            return self.learned_detector.detect_colors(person_crop)
+
         upper, upper_conf = self.get_upper_color(person_crop)
         lower, lower_conf = self.get_lower_color(person_crop)
         return {

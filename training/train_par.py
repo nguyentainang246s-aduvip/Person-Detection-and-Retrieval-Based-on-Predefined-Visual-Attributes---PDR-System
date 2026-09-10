@@ -68,6 +68,10 @@ NUM_WORKERS = 2       # 0 nếu gặp lỗi multiprocessing trên Windows
 N_ATTRS = 4           # female, hat, glasses, backpack
 ATTR_NAMES = ["female", "hat", "glasses", "backpack"]
 
+# Cấu hình Loss Function (Hỗ trợ "focal" hoặc "bce")
+LOSS_TYPE = "focal"     # "bce" hoặc "focal"
+FOCAL_GAMMA = 2.0       # gamma cho Focal Loss (chỉ dùng khi LOSS_TYPE="focal")
+
 # ══════════════════════════════════════════════════════════
 
 
@@ -206,6 +210,14 @@ def evaluate(model, loader, criterion, device):
 
 def train():
     """Main training function."""
+    # Đảm bảo kết quả reproducible (A5)
+    SEED = 42
+    torch.manual_seed(SEED)
+    np.random.seed(SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
     print("=" * 60)
     print("  PAR Model Training – ResNet50 on PA-100K")
@@ -235,7 +247,7 @@ def train():
     print(f"  Trainable params: {trainable_params:,}")
 
     # ── Loss & Optimizer ──
-    # Tính pos_weight cho BCEWithLogitsLoss để bù đắp mất cân bằng mẫu (đặc biệt Hat, Glasses, Backpack)
+    # Tính pos_weight để bù đắp mất cân bằng mẫu (đặc biệt Hat, Glasses, Backpack)
     try:
         train_ds = train_loader.dataset
         labels_all = torch.tensor(train_ds.labels, dtype=torch.float32)
@@ -245,10 +257,19 @@ def train():
         print(f"  Computed pos_weight: " + " | ".join(
             f"{ATTR_NAMES[i]}={pos_weight[i]:.2f}" for i in range(N_ATTRS)
         ))
-        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     except Exception as e:
-        print(f"  [Warning] Không thể tự động tính pos_weight ({e}), dùng BCEWithLogitsLoss mặc định.")
-        criterion = nn.BCEWithLogitsLoss()
+        print(f"  [Warning] Không thể tự động tính pos_weight ({e})")
+        pos_weight = None
+
+    # Chọn Loss Function (A2)
+    if LOSS_TYPE == "focal":
+        from src.attributes.par_model import FocalLoss
+        alpha_t = (1.0 / (1.0 + pos_weight)).to(device) if pos_weight is not None else None
+        criterion = FocalLoss(gamma=FOCAL_GAMMA, alpha=alpha_t)
+        print(f"  Loss: FocalLoss (gamma={FOCAL_GAMMA})")
+    else:
+        criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        print(f"  Loss: BCEWithLogitsLoss (pos_weight={'configured' if pos_weight is not None else 'None'})")
 
     # Dùng 2 learning rate khác nhau:
     # - Backbone: lr thấp (đã pretrained, không cần học nhiều)

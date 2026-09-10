@@ -67,22 +67,24 @@ PA100K_ATTR_IDX = {
     "backpack": 7,    # 0=No, 1=Yes
 }
 
-# Transform cho training (có augmentation)
+# Transform cho training (có augmentation nâng cao chống occlusion & camera nghiêng)
 TRAIN_TRANSFORM = T.Compose([
     T.Resize((256, 128)),           # Resize về 256×128 (portrait)
     T.RandomHorizontalFlip(p=0.5),  # Lật ngang ngẫu nhiên
-    T.ColorJitter(                  # Thay đổi màu sắc ngẫu nhiên
-        brightness=0.2,
-        contrast=0.2,
-        saturation=0.2,
+    T.ColorJitter(                  # Thay đổi màu sắc chống nhiễu ánh sáng
+        brightness=0.3,
+        contrast=0.3,
+        saturation=0.3,
         hue=0.1
     ),
+    T.RandomPerspective(distortion_scale=0.15, p=0.3),  # Mô phỏng góc nhìn CCTV nghiêng từ trên cao
     T.RandomCrop((224, 112)),        # Crop ngẫu nhiên → 224×112
     T.ToTensor(),                    # [H,W,C] uint8 → [C,H,W] float32 [0,1]
     T.Normalize(                     # Chuẩn hóa theo ImageNet stats
         mean=[0.485, 0.456, 0.406],
         std=[0.229, 0.224, 0.225]
     ),
+    T.RandomErasing(p=0.3, scale=(0.02, 0.15), ratio=(0.3, 3.3)),  # Mô phỏng che khuất (occlusion)
 ])
 
 # Transform cho val/test (không augmentation)

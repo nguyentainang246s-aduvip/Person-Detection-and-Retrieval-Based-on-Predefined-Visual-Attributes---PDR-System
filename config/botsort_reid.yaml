@@ -1,0 +1,20 @@
+# ============================================================
+# BoT-SORT Tracker Configuration with Appearance Re-ID (Giai đoạn 1)
+# ============================================================
+
+tracker_type: botsort
+track_high_thresh: 0.25      # Ngưỡng match lượt 1
+track_low_thresh: 0.1        # Ngưỡng match lượt 2 cho bbox mờ/nhỏ
+new_track_thresh: 0.25       # Ngưỡng tạo track mới
+track_buffer: 60             # Giữ track trong 60 frames (~2 giây) khi bị che khuất
+match_thresh: 0.8            # Ngưỡng chi phí match IoU
+fuse_score: True             # Kết hợp confidence score vào ma trận liên kết
+
+# Global Motion Compensation (giảm thiểu camera rung lắc)
+gmc_method: sparseOptFlow
+
+# Re-ID Appearance Matching
+proximity_thresh: 0.5        # Ngưỡng khoảng cách tối thiểu
+appearance_thresh: 0.75      # Ngưỡng tương đồng diện mạo tối thiểu để nhận lại ID
+with_reid: True              # Kích hoạt mô hình Re-ID embedding
+model: auto                  # Tự động trích xuất đặc trưng ngoại hình

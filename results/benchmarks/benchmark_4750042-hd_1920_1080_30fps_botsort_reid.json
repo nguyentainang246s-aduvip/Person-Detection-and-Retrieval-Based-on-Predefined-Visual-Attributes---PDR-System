@@ -1,0 +1,59 @@
+{
+  "video_path": "data/test_videos/4750042-hd_1920_1080_30fps.mp4",
+  "gt_path": "data/gt/4750042_gt.csv",
+  "tracker": "botsort_reid",
+  "total_frames": 393,
+  "tracking": {
+    "mota": 89.5,
+    "idf1": 84.56,
+    "idp": 80.88,
+    "idr": 88.59,
+    "id_switches": 19,
+    "false_positives": 310,
+    "misses": 6
+  },
+  "par": {
+    "mA": 52.47,
+    "gender": {
+      "acc": 63.9937106918239,
+      "prec": 78.93628225381781,
+      "rec": 66.80035650623886,
+      "f1": 72.36302196475982,
+      "ma": 62.03265688559806,
+      "count": 3180
+    },
+    "hat": {
+      "acc": 96.57232704402516,
+      "prec": 0.0,
+      "rec": 0.0,
+      "f1": 0.0,
+      "ma": 48.28616352201258,
+      "count": 3180
+    },
+    "glasses": {
+      "acc": 99.11949685534591,
+      "prec": 0.0,
+      "rec": 0.0,
+      "f1": 0.0,
+      "ma": 49.55974842767296,
+      "count": 3180
+    },
+    "backpack": {
+      "acc": 100.0,
+      "prec": 0.0,
+      "rec": 0.0,
+      "f1": 0.0,
+      "ma": 50.0,
+      "count": 3180
+    }
+  },
+  "color": {
+    "upper_color_accuracy": 65.38,
+    "lower_color_accuracy": 39.84,
+    "average_color_accuracy": 52.61
+  },
+  "performance": {
+    "latency_ms": 218.1,
+    "fps": 4.6
+  }
+}

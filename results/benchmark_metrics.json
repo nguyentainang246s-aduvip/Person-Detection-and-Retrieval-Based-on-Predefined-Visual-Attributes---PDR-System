@@ -1,0 +1,44 @@
+[
+  {
+    "id": "cctv_720p",
+    "name": "Clip 1: Camera CCTV Giám sát Ngoài trời (720p HD)",
+    "video_file": "data/test_videos/cctv_people_demo_720p.mp4",
+    "scenario": "Góc nhìn camera an ninh chéo từ trên cao, tầm nhìn rộng",
+    "query": "Nam, Áo Đen",
+    "frames_processed": 300,
+    "total_time_s": 9.31,
+    "avg_fps": 34.5,
+    "unique_tracks": 23,
+    "target_hits_count": 796,
+    "max_matching_score": 100.0,
+    "crops_saved": 3
+  },
+  {
+    "id": "street_1080p_1",
+    "name": "Clip 2: Người đi bộ Đường phố Độ phân giải cao (1080p FHD)",
+    "video_file": "data/test_videos/4750042-hd_1920_1080_30fps.mp4",
+    "scenario": "Người đi bộ cự ly gần, độ phân giải cao 1080p",
+    "query": "Nữ, Áo Trắng",
+    "frames_processed": 250,
+    "total_time_s": 11.3,
+    "avg_fps": 24.4,
+    "unique_tracks": 42,
+    "target_hits_count": 245,
+    "max_matching_score": 64.0,
+    "crops_saved": 3
+  },
+  {
+    "id": "crowd_occlusion",
+    "name": "Clip 3: Nhóm người & Che khuất vật cản - Occlusion (720p)",
+    "video_file": "data/test_videos/4750061-hd_1920_1080_30fps.mp4",
+    "scenario": "Nhiều người đi bộ đan xen, kiểm thử ByteTrack & Re-ID giữ track",
+    "query": "Nam, Áo Xanh Dương",
+    "frames_processed": 250,
+    "total_time_s": 11.96,
+    "avg_fps": 21.8,
+    "unique_tracks": 42,
+    "target_hits_count": 1366,
+    "max_matching_score": 100.0,
+    "crops_saved": 3
+  }
+]

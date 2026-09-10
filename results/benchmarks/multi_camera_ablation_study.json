@@ -1,0 +1,31 @@
+{
+  "multi_camera_results": [
+    {
+      "n_cameras": 1,
+      "avg_fps_per_cam": 29.81,
+      "total_throughput_fps": 29.81,
+      "avg_latency_ms": 28.1,
+      "drop_rate_pct": 0.0,
+      "cpu_usage_pct": 91.2,
+      "ram_mb": 496.3
+    },
+    {
+      "n_cameras": 2,
+      "avg_fps_per_cam": 27.19,
+      "total_throughput_fps": 54.38,
+      "avg_latency_ms": 31.28,
+      "drop_rate_pct": 0.0,
+      "cpu_usage_pct": 99.1,
+      "ram_mb": 519.1
+    },
+    {
+      "n_cameras": 4,
+      "avg_fps_per_cam": 24.57,
+      "total_throughput_fps": 98.27,
+      "avg_latency_ms": 35.2,
+      "drop_rate_pct": 0.0,
+      "cpu_usage_pct": 99.8,
+      "ram_mb": 574.7
+    }
+  ]
+}

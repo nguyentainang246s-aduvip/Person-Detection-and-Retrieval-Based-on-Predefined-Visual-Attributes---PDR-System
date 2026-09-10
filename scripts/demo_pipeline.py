@@ -85,6 +85,7 @@ def main():
     parser.add_argument("--threshold", type=float, default=None, help="Ngưỡng tương đồng (0.5 -> 1.0). Ghi đè config.yaml nếu cung cấp.")
     parser.add_argument("--max-frames", type=int, default=60, help="Số frames tối đa để xử lý")
     parser.add_argument("--display", action="store_true", help="Hiển thị cửa sổ video trực tiếp khi xử lý")
+    parser.add_argument("--webcam", action="store_true", help="Sử dụng trực tiếp Webcam của máy tính")
 
     args = parser.parse_args()
 
@@ -120,9 +121,16 @@ def main():
     print(f"  • Đeo kính  : {args.glasses}")
     print(f"  • Ngưỡng    : {final_threshold * 100:.0f}%\n")
 
-    if not os.path.exists(args.video):
-        print(f"[*] Đang tạo video mẫu thử nghiệm tại: {args.video}")
-        create_realistic_demo_video(args.video)
+    if args.webcam:
+        video_src = 0
+        max_frames_to_run = args.max_frames if args.max_frames != 60 else 999999
+        print("[*] Đang kết nối trực tiếp với Webcam máy tính (Camera 0)... Bấm 'q' để dừng.")
+    else:
+        video_src = int(args.video) if args.video.isdigit() else args.video
+        max_frames_to_run = args.max_frames
+        if not str(video_src).isdigit() and not os.path.exists(video_src):
+            print(f"[*] Đang tạo video mẫu thử nghiệm tại: {video_src}")
+            create_realistic_demo_video(video_src)
 
     # Khởi tạo và chạy Pipeline
     pipeline = PersonRetrievalPipeline(matching_threshold=final_threshold)
@@ -131,12 +139,12 @@ def main():
     csv_log = "results/logs/retrieval_results.csv"
 
     summary = pipeline.run_on_video(
-        video_source=args.video,
+        video_source=video_src,
         target_query=query,
         output_video_path=output_video,
         save_csv_log=csv_log,
         threshold=final_threshold,
-        max_frames=args.max_frames,
+        max_frames=max_frames_to_run,
         display=args.display
     )
 

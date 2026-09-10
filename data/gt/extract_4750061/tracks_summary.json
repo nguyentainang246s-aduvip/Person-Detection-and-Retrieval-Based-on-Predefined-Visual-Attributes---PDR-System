@@ -1,0 +1,693 @@
+{
+  "video_path": "data/test_videos/4750061-hd_1920_1080_30fps.mp4",
+  "total_frames": 769,
+  "total_raw_tracks": 98,
+  "tracks": [
+    {
+      "track_id": 1,
+      "first_frame": 0,
+      "last_frame": 19,
+      "duration_frames": 20,
+      "detection_count": 20
+    },
+    {
+      "track_id": 2,
+      "first_frame": 0,
+      "last_frame": 42,
+      "duration_frames": 43,
+      "detection_count": 43
+    },
+    {
+      "track_id": 3,
+      "first_frame": 0,
+      "last_frame": 56,
+      "duration_frames": 57,
+      "detection_count": 57
+    },
+    {
+      "track_id": 4,
+      "first_frame": 0,
+      "last_frame": 66,
+      "duration_frames": 67,
+      "detection_count": 67
+    },
+    {
+      "track_id": 5,
+      "first_frame": 0,
+      "last_frame": 34,
+      "duration_frames": 35,
+      "detection_count": 35
+    },
+    {
+      "track_id": 6,
+      "first_frame": 0,
+      "last_frame": 377,
+      "duration_frames": 378,
+      "detection_count": 352
+    },
+    {
+      "track_id": 7,
+      "first_frame": 0,
+      "last_frame": 101,
+      "duration_frames": 102,
+      "detection_count": 91
+    },
+    {
+      "track_id": 8,
+      "first_frame": 0,
+      "last_frame": 423,
+      "duration_frames": 424,
+      "detection_count": 405
+    },
+    {
+      "track_id": 9,
+      "first_frame": 0,
+      "last_frame": 9,
+      "duration_frames": 10,
+      "detection_count": 10
+    },
+    {
+      "track_id": 10,
+      "first_frame": 4,
+      "last_frame": 49,
+      "duration_frames": 46,
+      "detection_count": 16
+    },
+    {
+      "track_id": 11,
+      "first_frame": 11,
+      "last_frame": 58,
+      "duration_frames": 48,
+      "detection_count": 30
+    },
+    {
+      "track_id": 13,
+      "first_frame": 19,
+      "last_frame": 89,
+      "duration_frames": 71,
+      "detection_count": 65
+    },
+    {
+      "track_id": 14,
+      "first_frame": 20,
+      "last_frame": 159,
+      "duration_frames": 140,
+      "detection_count": 140
+    },
+    {
+      "track_id": 17,
+      "first_frame": 26,
+      "last_frame": 82,
+      "duration_frames": 57,
+      "detection_count": 39
+    },
+    {
+      "track_id": 18,
+      "first_frame": 50,
+      "last_frame": 80,
+      "duration_frames": 31,
+      "detection_count": 27
+    },
+    {
+      "track_id": 19,
+      "first_frame": 51,
+      "last_frame": 466,
+      "duration_frames": 416,
+      "detection_count": 386
+    },
+    {
+      "track_id": 20,
+      "first_frame": 52,
+      "last_frame": 116,
+      "duration_frames": 65,
+      "detection_count": 49
+    },
+    {
+      "track_id": 21,
+      "first_frame": 53,
+      "last_frame": 359,
+      "duration_frames": 307,
+      "detection_count": 252
+    },
+    {
+      "track_id": 22,
+      "first_frame": 65,
+      "last_frame": 200,
+      "duration_frames": 136,
+      "detection_count": 136
+    },
+    {
+      "track_id": 23,
+      "first_frame": 65,
+      "last_frame": 167,
+      "duration_frames": 103,
+      "detection_count": 103
+    },
+    {
+      "track_id": 24,
+      "first_frame": 71,
+      "last_frame": 71,
+      "duration_frames": 1,
+      "detection_count": 1
+    },
+    {
+      "track_id": 25,
+      "first_frame": 72,
+      "last_frame": 114,
+      "duration_frames": 43,
+      "detection_count": 35
+    },
+    {
+      "track_id": 26,
+      "first_frame": 73,
+      "last_frame": 110,
+      "duration_frames": 38,
+      "detection_count": 23
+    },
+    {
+      "track_id": 27,
+      "first_frame": 75,
+      "last_frame": 117,
+      "duration_frames": 43,
+      "detection_count": 43
+    },
+    {
+      "track_id": 29,
+      "first_frame": 89,
+      "last_frame": 140,
+      "duration_frames": 52,
+      "detection_count": 37
+    },
+    {
+      "track_id": 31,
+      "first_frame": 94,
+      "last_frame": 260,
+      "duration_frames": 167,
+      "detection_count": 160
+    },
+    {
+      "track_id": 32,
+      "first_frame": 107,
+      "last_frame": 289,
+      "duration_frames": 183,
+      "detection_count": 182
+    },
+    {
+      "track_id": 33,
+      "first_frame": 125,
+      "last_frame": 126,
+      "duration_frames": 2,
+      "detection_count": 2
+    },
+    {
+      "track_id": 34,
+      "first_frame": 130,
+      "last_frame": 132,
+      "duration_frames": 3,
+      "detection_count": 3
+    },
+    {
+      "track_id": 35,
+      "first_frame": 149,
+      "last_frame": 153,
+      "duration_frames": 5,
+      "detection_count": 5
+    },
+    {
+      "track_id": 36,
+      "first_frame": 155,
+      "last_frame": 279,
+      "duration_frames": 125,
+      "detection_count": 125
+    },
+    {
+      "track_id": 37,
+      "first_frame": 159,
+      "last_frame": 168,
+      "duration_frames": 10,
+      "detection_count": 10
+    },
+    {
+      "track_id": 38,
+      "first_frame": 166,
+      "last_frame": 353,
+      "duration_frames": 188,
+      "detection_count": 180
+    },
+    {
+      "track_id": 39,
+      "first_frame": 178,
+      "last_frame": 264,
+      "duration_frames": 87,
+      "detection_count": 47
+    },
+    {
+      "track_id": 40,
+      "first_frame": 182,
+      "last_frame": 189,
+      "duration_frames": 8,
+      "detection_count": 8
+    },
+    {
+      "track_id": 41,
+      "first_frame": 221,
+      "last_frame": 270,
+      "duration_frames": 50,
+      "detection_count": 50
+    },
+    {
+      "track_id": 43,
+      "first_frame": 225,
+      "last_frame": 234,
+      "duration_frames": 10,
+      "detection_count": 10
+    },
+    {
+      "track_id": 45,
+      "first_frame": 237,
+      "last_frame": 318,
+      "duration_frames": 82,
+      "detection_count": 77
+    },
+    {
+      "track_id": 46,
+      "first_frame": 250,
+      "last_frame": 298,
+      "duration_frames": 49,
+      "detection_count": 27
+    },
+    {
+      "track_id": 48,
+      "first_frame": 254,
+      "last_frame": 258,
+      "duration_frames": 5,
+      "detection_count": 5
+    },
+    {
+      "track_id": 49,
+      "first_frame": 278,
+      "last_frame": 375,
+      "duration_frames": 98,
+      "detection_count": 98
+    },
+    {
+      "track_id": 50,
+      "first_frame": 284,
+      "last_frame": 293,
+      "duration_frames": 10,
+      "detection_count": 10
+    },
+    {
+      "track_id": 51,
+      "first_frame": 303,
+      "last_frame": 373,
+      "duration_frames": 71,
+      "detection_count": 71
+    },
+    {
+      "track_id": 52,
+      "first_frame": 316,
+      "last_frame": 436,
+      "duration_frames": 121,
+      "detection_count": 114
+    },
+    {
+      "track_id": 53,
+      "first_frame": 324,
+      "last_frame": 381,
+      "duration_frames": 58,
+      "detection_count": 58
+    },
+    {
+      "track_id": 54,
+      "first_frame": 327,
+      "last_frame": 330,
+      "duration_frames": 4,
+      "detection_count": 4
+    },
+    {
+      "track_id": 55,
+      "first_frame": 333,
+      "last_frame": 768,
+      "duration_frames": 436,
+      "detection_count": 428
+    },
+    {
+      "track_id": 57,
+      "first_frame": 356,
+      "last_frame": 357,
+      "duration_frames": 2,
+      "detection_count": 2
+    },
+    {
+      "track_id": 59,
+      "first_frame": 364,
+      "last_frame": 472,
+      "duration_frames": 109,
+      "detection_count": 78
+    },
+    {
+      "track_id": 60,
+      "first_frame": 368,
+      "last_frame": 505,
+      "duration_frames": 138,
+      "detection_count": 138
+    },
+    {
+      "track_id": 61,
+      "first_frame": 372,
+      "last_frame": 522,
+      "duration_frames": 151,
+      "detection_count": 151
+    },
+    {
+      "track_id": 62,
+      "first_frame": 382,
+      "last_frame": 503,
+      "duration_frames": 122,
+      "detection_count": 122
+    },
+    {
+      "track_id": 63,
+      "first_frame": 383,
+      "last_frame": 386,
+      "duration_frames": 4,
+      "detection_count": 4
+    },
+    {
+      "track_id": 64,
+      "first_frame": 387,
+      "last_frame": 442,
+      "duration_frames": 56,
+      "detection_count": 42
+    },
+    {
+      "track_id": 65,
+      "first_frame": 388,
+      "last_frame": 405,
+      "duration_frames": 18,
+      "detection_count": 18
+    },
+    {
+      "track_id": 66,
+      "first_frame": 389,
+      "last_frame": 406,
+      "duration_frames": 18,
+      "detection_count": 9
+    },
+    {
+      "track_id": 67,
+      "first_frame": 391,
+      "last_frame": 457,
+      "duration_frames": 67,
+      "detection_count": 43
+    },
+    {
+      "track_id": 68,
+      "first_frame": 408,
+      "last_frame": 412,
+      "duration_frames": 5,
+      "detection_count": 4
+    },
+    {
+      "track_id": 69,
+      "first_frame": 412,
+      "last_frame": 443,
+      "duration_frames": 32,
+      "detection_count": 18
+    },
+    {
+      "track_id": 70,
+      "first_frame": 412,
+      "last_frame": 443,
+      "duration_frames": 32,
+      "detection_count": 30
+    },
+    {
+      "track_id": 71,
+      "first_frame": 417,
+      "last_frame": 419,
+      "duration_frames": 3,
+      "detection_count": 3
+    },
+    {
+      "track_id": 74,
+      "first_frame": 429,
+      "last_frame": 513,
+      "duration_frames": 85,
+      "detection_count": 67
+    },
+    {
+      "track_id": 76,
+      "first_frame": 431,
+      "last_frame": 768,
+      "duration_frames": 338,
+      "detection_count": 338
+    },
+    {
+      "track_id": 77,
+      "first_frame": 445,
+      "last_frame": 451,
+      "duration_frames": 7,
+      "detection_count": 7
+    },
+    {
+      "track_id": 79,
+      "first_frame": 459,
+      "last_frame": 476,
+      "duration_frames": 18,
+      "detection_count": 18
+    },
+    {
+      "track_id": 80,
+      "first_frame": 462,
+      "last_frame": 488,
+      "duration_frames": 27,
+      "detection_count": 27
+    },
+    {
+      "track_id": 82,
+      "first_frame": 463,
+      "last_frame": 768,
+      "duration_frames": 306,
+      "detection_count": 306
+    },
+    {
+      "track_id": 84,
+      "first_frame": 470,
+      "last_frame": 498,
+      "duration_frames": 29,
+      "detection_count": 3
+    },
+    {
+      "track_id": 85,
+      "first_frame": 474,
+      "last_frame": 499,
+      "duration_frames": 26,
+      "detection_count": 26
+    },
+    {
+      "track_id": 86,
+      "first_frame": 483,
+      "last_frame": 517,
+      "duration_frames": 35,
+      "detection_count": 32
+    },
+    {
+      "track_id": 87,
+      "first_frame": 484,
+      "last_frame": 768,
+      "duration_frames": 285,
+      "detection_count": 285
+    },
+    {
+      "track_id": 88,
+      "first_frame": 486,
+      "last_frame": 510,
+      "duration_frames": 25,
+      "detection_count": 25
+    },
+    {
+      "track_id": 90,
+      "first_frame": 496,
+      "last_frame": 768,
+      "duration_frames": 273,
+      "detection_count": 273
+    },
+    {
+      "track_id": 91,
+      "first_frame": 503,
+      "last_frame": 503,
+      "duration_frames": 1,
+      "detection_count": 1
+    },
+    {
+      "track_id": 92,
+      "first_frame": 508,
+      "last_frame": 544,
+      "duration_frames": 37,
+      "detection_count": 37
+    },
+    {
+      "track_id": 94,
+      "first_frame": 509,
+      "last_frame": 515,
+      "duration_frames": 7,
+      "detection_count": 3
+    },
+    {
+      "track_id": 95,
+      "first_frame": 509,
+      "last_frame": 509,
+      "duration_frames": 1,
+      "detection_count": 1
+    },
+    {
+      "track_id": 96,
+      "first_frame": 519,
+      "last_frame": 524,
+      "duration_frames": 6,
+      "detection_count": 4
+    },
+    {
+      "track_id": 97,
+      "first_frame": 524,
+      "last_frame": 547,
+      "duration_frames": 24,
+      "detection_count": 20
+    },
+    {
+      "track_id": 98,
+      "first_frame": 534,
+      "last_frame": 570,
+      "duration_frames": 37,
+      "detection_count": 37
+    },
+    {
+      "track_id": 100,
+      "first_frame": 541,
+      "last_frame": 625,
+      "duration_frames": 85,
+      "detection_count": 77
+    },
+    {
+      "track_id": 101,
+      "first_frame": 553,
+      "last_frame": 621,
+      "duration_frames": 69,
+      "detection_count": 58
+    },
+    {
+      "track_id": 102,
+      "first_frame": 565,
+      "last_frame": 604,
+      "duration_frames": 40,
+      "detection_count": 34
+    },
+    {
+      "track_id": 103,
+      "first_frame": 570,
+      "last_frame": 627,
+      "duration_frames": 58,
+      "detection_count": 29
+    },
+    {
+      "track_id": 106,
+      "first_frame": 597,
+      "last_frame": 768,
+      "duration_frames": 172,
+      "detection_count": 172
+    },
+    {
+      "track_id": 108,
+      "first_frame": 603,
+      "last_frame": 635,
+      "duration_frames": 33,
+      "detection_count": 31
+    },
+    {
+      "track_id": 109,
+      "first_frame": 612,
+      "last_frame": 747,
+      "duration_frames": 136,
+      "detection_count": 82
+    },
+    {
+      "track_id": 110,
+      "first_frame": 623,
+      "last_frame": 736,
+      "duration_frames": 114,
+      "detection_count": 95
+    },
+    {
+      "track_id": 111,
+      "first_frame": 639,
+      "last_frame": 639,
+      "duration_frames": 1,
+      "detection_count": 1
+    },
+    {
+      "track_id": 112,
+      "first_frame": 645,
+      "last_frame": 768,
+      "duration_frames": 124,
+      "detection_count": 124
+    },
+    {
+      "track_id": 113,
+      "first_frame": 652,
+      "last_frame": 768,
+      "duration_frames": 117,
+      "detection_count": 117
+    },
+    {
+      "track_id": 114,
+      "first_frame": 654,
+      "last_frame": 654,
+      "duration_frames": 1,
+      "detection_count": 1
+    },
+    {
+      "track_id": 115,
+      "first_frame": 655,
+      "last_frame": 672,
+      "duration_frames": 18,
+      "detection_count": 18
+    },
+    {
+      "track_id": 118,
+      "first_frame": 669,
+      "last_frame": 768,
+      "duration_frames": 100,
+      "detection_count": 71
+    },
+    {
+      "track_id": 119,
+      "first_frame": 701,
+      "last_frame": 719,
+      "duration_frames": 19,
+      "detection_count": 17
+    },
+    {
+      "track_id": 120,
+      "first_frame": 704,
+      "last_frame": 727,
+      "duration_frames": 24,
+      "detection_count": 24
+    },
+    {
+      "track_id": 121,
+      "first_frame": 738,
+      "last_frame": 750,
+      "duration_frames": 13,
+      "detection_count": 13
+    },
+    {
+      "track_id": 122,
+      "first_frame": 759,
+      "last_frame": 768,
+      "duration_frames": 10,
+      "detection_count": 10
+    }
+  ]
+}

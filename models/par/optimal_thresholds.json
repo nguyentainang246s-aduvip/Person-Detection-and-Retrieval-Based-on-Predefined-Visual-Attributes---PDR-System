@@ -1,0 +1,30 @@
+{
+  "female": {
+    "optimal_threshold": 0.44,
+    "max_f1": 0.954,
+    "precision": 0.922,
+    "recall": 0.988,
+    "recommended_cctv": 0.44
+  },
+  "hat": {
+    "optimal_threshold": 0.54,
+    "max_f1": 0.925,
+    "precision": 0.902,
+    "recall": 0.949,
+    "recommended_cctv": 0.59
+  },
+  "glasses": {
+    "optimal_threshold": 0.58,
+    "max_f1": 0.929,
+    "precision": 0.967,
+    "recall": 0.894,
+    "recommended_cctv": 0.58
+  },
+  "backpack": {
+    "optimal_threshold": 0.56,
+    "max_f1": 0.857,
+    "precision": 0.812,
+    "recall": 0.907,
+    "recommended_cctv": 0.56
+  }
+}

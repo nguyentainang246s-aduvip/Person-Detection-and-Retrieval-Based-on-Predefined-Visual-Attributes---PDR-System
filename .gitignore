@@ -100,3 +100,8 @@ $RECYCLE.BIN/
 # SQLite WAL files
 *-wal
 *-shm
+
+# Temp scratch scripts & benchmark crop caches
+scratch/
+results/benchmark_crops/
+/yolov8n.pt

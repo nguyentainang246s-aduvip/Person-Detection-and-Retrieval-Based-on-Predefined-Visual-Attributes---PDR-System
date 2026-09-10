@@ -25,6 +25,8 @@ Kiến thức cần biết:
 import cv2
 import time
 import os
+import math
+import numpy as np
 from pathlib import Path
 
 
@@ -45,16 +47,23 @@ def open_video(source):
         cap, info = open_video("data/test_videos/sample.mp4")
         print(info)  # {'width': 1920, 'height': 1080, 'fps': 30.0, ...}
     """
+    if isinstance(source, str) and source.strip().isdigit():
+        source = int(source.strip())
+
     cap = cv2.VideoCapture(source)
 
     if not cap.isOpened():
-        raise ValueError(f"Không thể mở video: {source}")
+        raise ValueError(f"Không thể mở video hoặc camera: {source}")
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps is None or fps <= 0 or np.isnan(fps):
+        fps = 25.0
 
     info = {
         "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
         "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        "fps": cap.get(cv2.CAP_PROP_FPS),
-        "total_frames": int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+        "fps": float(fps),
+        "total_frames": max(0, int(cap.get(cv2.CAP_PROP_FRAME_COUNT))),
         "source": str(source),
     }
 
